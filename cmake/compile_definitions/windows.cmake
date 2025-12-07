@@ -1,6 +1,6 @@
 # windows specific compile definitions
 
-add_compile_definitions(SUNSHINE_PLATFORM="windows")
+add_compile_definitions(SUNSHINE_PLATFORM="windows" -DNOMINMAX)
 
 enable_language(RC)
 set(CMAKE_RC_COMPILER windres)
