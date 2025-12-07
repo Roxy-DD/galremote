@@ -18,7 +18,7 @@ on:
       ref:
         description: "Branch or tag to checkout (e.g., master, v2025.1116)"
         required: true
-        default: "master"
+        default: "main"
       release-tag:
         description: "Release tag for naming the output files"
         required: true
@@ -149,7 +149,7 @@ jobs:
       - name: Build Windows
         shell: msys2 {0}
         env:
-          BRANCH: master
+          BRANCH: main
           BUILD_VERSION: ${{ github.event_name == 'release' && github.event.release.tag_name || github.event.inputs.release-tag }}.杂鱼
           COMMIT: ${{ github.sha }}
         run: |

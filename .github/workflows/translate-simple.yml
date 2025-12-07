@@ -3,7 +3,7 @@ name: Simple README Translation
 on:
   push:
     branches:
-      - master
+      - main
     paths:
       - 'README.md'
   workflow_dispatch:
