@@ -23563,6 +23563,201 @@ NVAPI_INTERFACE NvAPI_GPU_ClientRegisterForUtilizationSampleUpdates(__in NvPhysi
 
 #ifdef __cplusplus
 }; //extern "C" {
+{
+    /*!
+     * [in] Generic callback parameter which will be passed to the callback.
+     */
+    void* pCallbackParam;
+
+    /*!
+     * Reserved bytes for future expansion.
+     */
+    NvU8 rsvd[64];
+} NV_CLIENT_CALLBACK_SETTINGS_SUPER_V1;
+
+typedef NV_CLIENT_CALLBACK_SETTINGS_SUPER_V1 NV_GPU_CLIENT_CALLBACK_SETTINGS_SUPER_V1;
+
+
+/*!
+ * Callback settings common to all periodic client callbacks.
+ */
+typedef struct _NV_GPU_CLIENT_PERIODIC_CALLBACK_SETTINGS_SUPER_V1
+{
+    /*!
+     * [in] Super class data.
+     */
+    NV_GPU_CLIENT_CALLBACK_SETTINGS_SUPER_V1 super;
+
+    /*!
+     * [in] Minimum interval at which callback will be called.
+     *
+     * The callback may be invoked slower than this interval if underlying
+     * sampling rate does not align precisely to the provided period.
+     */
+    NvU32 callbackPeriodms;
+
+    /*!
+     * Reserved bytes for future expansion.
+     */
+    NvU8 rsvd[64];
+} NV_GPU_CLIENT_PERIODIC_CALLBACK_SETTINGS_SUPER_V1;
+
+/*!
+ * Callback data common to all client callbacks.
+ */
+typedef struct _NV_GPU_CLIENT_CALLBACK_DATA_SUPER_V1
+{
+    /*!
+     * [out] Generic callback parameter which was passed in at registration time.
+     */
+    void* pCallbackParam;
+
+    /*!
+     * Reserved bytes for future expansion.
+     */
+    NvU8 rsvd[64];
+} NV_GPU_CLIENT_CALLBACK_DATA_SUPER_V1;
+
+
+/*!
+ * Enumeration of different utilization domains
+ */
+typedef enum _NV_GPU_CLIENT_UTIL_DOMAIN_ID
+{
+    NV_GPU_CLIENT_UTIL_DOMAIN_GRAPHICS = 0,
+    NV_GPU_CLIENT_UTIL_DOMAIN_FRAME_BUFFER = 1,
+    NV_GPU_CLIENT_UTIL_DOMAIN_VIDEO = 2,
+    /*!
+     * Reserved for future use.
+     */
+    NV_GPU_CLIENT_UTIL_DOMAIN_RSVD = 3,
+} NV_GPU_CLIENT_UTIL_DOMAIN_ID;
+
+#define NV_GPU_CLIENT_UTIL_DOMAINS_MAX_V1                                    (4)
+
+/*!
+ * Data specific to a single utilization domain.
+ */
+typedef struct _NV_GPU_CLIENT_UTILIZATION_DATA_V1
+{
+    /*!
+     * [out] Utilization domain identifier.
+     */
+    NV_GPU_CLIENT_UTIL_DOMAIN_ID utilId;
+
+    /*!
+     * [out] Percentage of time where the domain is considered busy since the
+     * last sample. Units of percent*100; i.e. 5000 = 50%.
+     */
+    NvU32 utilizationPercent;
+
+    /*!
+     * Reserved bytes for future expansion.
+     */
+    NvU8 rsvd[61];
+} NV_GPU_CLIENT_UTILIZATION_DATA_V1;
+
+/*!
+ * Data passed back to callback registered with
+ * @ref NvAPI_GPU_ClientRegisterForUtilizationSampleUpdates.
+ */
+typedef struct _NV_GPU_CLIENT_CALLBACK_UTILIZATION_DATA_V1
+{
+    /*!
+     * [out] Super struct.
+     */
+    NV_GPU_CLIENT_CALLBACK_DATA_SUPER_V1 super;
+
+    /*!
+     * [out] Number of valid entries in `utils` array.
+     */
+    NvU32 numUtils;
+
+    /*!
+     * [out] Time at which data was collected. Represented as elapsed
+     * microseconds since 00:00:00 UTC on January 1, 1970.
+     */
+    NvU64 timestamp;
+
+    /*!
+     * Reserved bytes for future expansion.
+     */
+    NvU8 rsvd[64];
+
+    /*!
+     * [out] Status data for each utilization domain.
+     */
+    NV_GPU_CLIENT_UTILIZATION_DATA_V1 utils[NV_GPU_CLIENT_UTIL_DOMAINS_MAX_V1];
+} NV_GPU_CLIENT_CALLBACK_UTILIZATION_DATA_V1;
+
+/*!
+ * Function prototype for a periodic utilization data callback that will be registered with NvAPI.
+ */
+typedef void (__cdecl *NV_GPU_CLIENT_UTILIZATION_PERIODIC_CALLBACK_V1)(NvPhysicalGpuHandle hPhysicalGpu, NV_GPU_CLIENT_CALLBACK_UTILIZATION_DATA_V1* pData);
+
+/*!
+ * Data required to register a periodic callback for utilization data.
+ */
+typedef struct _NV_GPU_CLIENT_UTILIZATION_PERIODIC_CALLBACK_SETTINGS_V1
+{
+    /*!
+     * [in] Structure Version, must always be first.
+     */
+    NvU32 version;
+
+    /*!
+     * [in] Generic callback settings. Some data within will be passed to the
+     * callback when invoked.
+     */
+    NV_GPU_CLIENT_PERIODIC_CALLBACK_SETTINGS_SUPER_V1 super;
+
+    /*!
+     * [in] Callback. Pass in NULL or nullptr to indicate request to unregister.
+     */
+    NV_GPU_CLIENT_UTILIZATION_PERIODIC_CALLBACK_V1 callback;
+
+    /*!
+     * Reserved bytes for future expansion.
+     */
+    NvU8 rsvd[64];
+} NV_GPU_CLIENT_UTILIZATION_PERIODIC_CALLBACK_SETTINGS_V1;
+
+#define NV_GPU_CLIENT_UTILIZATION_PERIODIC_CALLBACK_SETTINGS_VER1  MAKE_NVAPI_VERSION(NV_GPU_CLIENT_UTILIZATION_PERIODIC_CALLBACK_SETTINGS_V1, 1)
+typedef NV_GPU_CLIENT_UTILIZATION_PERIODIC_CALLBACK_SETTINGS_V1    NV_GPU_CLIENT_UTILIZATION_PERIODIC_CALLBACK_SETTINGS;
+#define NV_GPU_CLIENT_UTILIZATION_PERIODIC_CALLBACK_SETTINGS_VER   NV_GPU_CLIENT_UTILIZATION_PERIODIC_CALLBACK_SETTINGS_VER1
+
+///////////////////////////////////////////////////////////////////////////////
+//
+// FUNCTION NAME: NvAPI_GPU_ClientRegisterForUtilizationSampleUpdates
+//
+//! \fn NvAPI_GPU_ClientRegisterForUtilizationSampleUpdates()
+//! \code
+//!   DESCRIPTION: Register to receive samples of utilization data periodically
+//!                via a function pointer callback.
+//!
+//! SUPPORTED OS:  Windows 10 and higher
+//!
+//!
+//! \since Release 455
+//!
+//! \return        NVAPI_OK                          - Registration was successful
+//!                NVAPI_API_NOT_INITIALIZED         - NVAPI not initialized
+//!                NVAPI_INCOMPATIBLE_STRUCT_VERSION - Invalid structure version specified
+//!                NVAPI_INVALID_CONFIGURATION       - Invalid software environment configuration
+//!                NVAPI_TIMEOUT                     - Registration request timed out
+//!                NVAPI_ERROR                       - Unknown underlying error
+//!
+//! \endcode
+//! \ingroup nvtopps
+///////////////////////////////////////////////////////////////////////////////
+NVAPI_INTERFACE NvAPI_GPU_ClientRegisterForUtilizationSampleUpdates(__in NvPhysicalGpuHandle hPhysicalGpu, __in NV_GPU_CLIENT_UTILIZATION_PERIODIC_CALLBACK_SETTINGS* pCallbackSettings);
+
+
+
+
+
+#ifdef __cplusplus
+}; //extern "C" {
 
 #endif
 
@@ -23570,4 +23765,6 @@ NVAPI_INTERFACE NvAPI_GPU_ClientRegisterForUtilizationSampleUpdates(__in NvPhysi
 
 #endif // _NVAPI_H
 
-#include"nvapi_lite_salend.h"
+#include "nvapi_lite_salstart.h"
+#include "nvapi_lite_common.h"
+#include "nvapi_lite_salstart.h"

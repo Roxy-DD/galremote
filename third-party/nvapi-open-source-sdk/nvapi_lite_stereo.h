@@ -25,6 +25,7 @@
 \*********************************************************************************************************/
 
 #pragma once
+#include"nvapi_lite_salstart.h"
 #include"nvapi_lite_common.h"
 #include"nvapi_lite_salstart.h"
 #pragma pack(push,8)
