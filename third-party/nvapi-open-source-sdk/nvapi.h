@@ -29,19 +29,6 @@
 // File: nvapi.h
 //
 // NvAPI provides an interface to NVIDIA devices. This file contains the 
-// interface constants, structure definitions and function prototypes.
-//
-//   Target Profile: Open-Source
-//  Target Platform: windows
-//
-///////////////////////////////////////////////////////////////////////////////
-#include"nvapi_lite_salstart.h"
-#include"nvapi_lite_common.h"
-#include"nvapi_lite_sli.h"
-#include"nvapi_lite_surround.h"
-#include"nvapi_lite_stereo.h"
-#include"nvapi_lite_d3dext.h"
-#ifndef _NVAPI_H
 #define _NVAPI_H
 
 #pragma pack(push,8) // Make sure we have consistent structure packings
