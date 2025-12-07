@@ -1,3 +1,12 @@
+# windows specific compile definitions
+
+add_compile_definitions(SUNSHINE_PLATFORM="windows")
+
+enable_language(RC)
+set(CMAKE_RC_COMPILER windres)
+set(CMAKE_RC_FLAGS "${CMAKE_RC_FLAGS} --use-temp-file")
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static")
+
 # gcc complains about misleading indentation in some mingw includes
 list(APPEND SUNSHINE_COMPILE_OPTIONS -Wno-misleading-indentation)
 
