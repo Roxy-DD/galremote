@@ -1,0 +1,81 @@
+[package]
+name = "sunshine-gui"
+version = "0.2.6"
+description = "A GUI for sunshine"
+authors = ["qiin2333"]
+license = ""
+repository = "https://github.com/qiin2333/sunshine"
+edition = "2024"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[build-dependencies]
+tauri-build = { version = "2.5.0", features = [] }
+
+[dependencies]
+tauri = { version = "2.9.4", features = [ "tray-icon", "native-tls-vendored"] }
+tauri-plugin-shell = "2.3.3"
+tauri-plugin-dialog = "2.4.2"
+tauri-plugin-fs = "2.4.4"
+tauri-plugin-single-instance = "2"
+tauri-plugin-global-shortcut = "2"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1", features = ["full"] }
+reqwest = { version = "0.12", features = ["json", "rustls-tls", "stream"], default-features = false }
+axum = "0.8"
+tower = "0.5"
+tower-http = { version = "0.6", features = ["cors"] }
+once_cell = "1.20"
+wmi = "0.18"
+quick-xml = { version = "0.37", features = ["serialize"] }
+encoding_rs = "0.8"
+regex = "1.11"
+base64 = "0.22"
+chrono = { version = "0.4", features = ["serde"] }
+url = "2.5"
+dirs = "6.0"
+futures-util = "0.3"
+bytes = "1.9"
+log = "0.4"
+env_logger = "0.11"
+
+# Galgame 存档管理依赖
+opendal = { version = "0.52", features = ["services-webdav", "services-s3", "services-onedrive", "services-gdrive", "services-oss", "services-github"] }
+zip = "2.2"
+walkdir = "2.5"
+async-trait = "0.1"
+thiserror = "2.0"
+uuid = { version = "1.11", features = ["v4"] }
+notify = { version = "7.0", default-features = false, features = ["macos_fsevent"] }
+
+[features]
+# by default Tauri runs in production mode
+# when `tauri dev` runs it is executed with `cargo run --no-default-features` if `devPath` is an URL
+default = ["custom-protocol"]
+# this feature is used for production builds or when `devPath` points to the filesystem
+# DO NOT REMOVE!!
+custom-protocol = ["tauri/custom-protocol"]
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62", features = [
+    "Win32",
+    "Win32_Foundation",
+    "Win32_Storage_FileSystem",
+    "Win32_System_IO",
+    "Win32_System_Pipes",
+    "Win32_System_Threading",
+    "Win32_System_Power",
+    "Win32_System_Com",
+    "Win32_System_Com_StructuredStorage",
+    "Win32_Security",
+    "Win32_Graphics_Gdi",
+    "Win32_Graphics_Imaging",
+    "Win32_UI",
+    "Win32_UI_Shell",
+    "Win32_UI_Shell_Common",
+    "Win32_UI_HiDpi",
+    "Win32_UI_WindowsAndMessaging",
+] }
+winreg = "0.55"
+image = "0.25"

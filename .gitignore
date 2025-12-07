@@ -1,0 +1,60 @@
+# Prerequisites
+*.d
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.out
+*.app
+
+# JetBrains IDE
+.idea/
+
+# VSCode IDE
+.vscode/
+.vs/
+
+# build directories
+build/
+cmake-*/
+docs/doxyconfig*
+
+# npm
+node_modules/
+package-lock.json
+
+# Translations
+*.mo
+*.pot
+
+# Dummy macOS files
+.DS_Store
+
+# Python
+*.pyc
+venv/
+
+# Generated files
+src_assets/common/assets/web/welcome.html

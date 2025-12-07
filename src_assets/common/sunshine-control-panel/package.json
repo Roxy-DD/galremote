@@ -1,0 +1,45 @@
+{
+  "name": "sunshine-gui",
+  "version": "0.2.6",
+  "description": "A GUI for sunshine",
+  "type": "module",
+  "scripts": {
+    "dev": "tauri dev",
+    "dev-webui": "cross-env WEBUI_DEV_TARGET=https://localhost:3000 tauri dev",
+    "dev:toolbar": "npm run build:renderer && cargo build --manifest-path src-tauri/Cargo.toml && src-tauri\\target\\debug\\sunshine-gui.exe --toolbar",
+    "dev:renderer": "vite --config vite.config.js",
+    "build": "tauri build",
+    "build:renderer": "vite build --config vite.config.js",
+    "build:home": "vite build --config vite.home.config.js --mode production",
+    "dev:home": "vite --config vite.home.config.js --mode development",
+    "preview:home": "vite preview --config vite.home.config.js",
+    "build:win": "npm run build:renderer && tauri build --target x86_64-pc-windows-msvc --bundles nsis"
+  },
+  "repository": "https://github.com/qiin2333/sunshine",
+  "author": {
+    "name": "qiin2333",
+    "url": "https://github.com/qiin2333"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.8.4",
+    "@vitejs/plugin-vue": "^4.5.1",
+    "cross-env": "^7.0.3",
+    "less": "^4.2.2",
+    "less-loader": "^12.2.0",
+    "rollup": "^4.22.4",
+    "vite": "^4.5.5"
+  },
+  "dependencies": {
+    "@element-plus/icons-vue": "^2.3.2",
+    "@tauri-apps/api": "^2.9.1",
+    "@tauri-apps/plugin-dialog": "^2.4.2",
+    "@tauri-apps/plugin-fs": "^2.4.4",
+    "@tauri-apps/plugin-shell": "^2.3.3",
+    "element-plus": "^2.11.9",
+    "markdown-it": "^14.1.0",
+    "pixi.js": "^8.6.6",
+    "systeminformation": "^5.25.11",
+    "vue": "^3.5.4",
+    "xml2js": "^0.6.2"
+  }
+}

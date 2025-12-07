@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="auto">
+  <head>
+    <%- header %>
+  </head>
+
+  <body id="app" v-cloak>
+    <!-- Vue 应用挂载点 -->
+  </body>
+
+  <script type="module">
+    import { createApp } from 'vue'
+    import { initApp } from './init'
+    import Home from './views/Home.vue'
+    import { initFirebase } from './config/firebase.js'
+
+    console.log('Hello, Sunshine!')
+
+    // 初始化Firebase Analytics
+    initFirebase()
+
+    // 创建应用实例
+    const app = createApp(Home)
+
+    // 初始化应用（包含 i18n 等）
+    initApp(app)
+  </script>
+</html>

@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="auto">
+  <head>
+    <%- header %>
+    <link rel="stylesheet" href="./styles/apps.css" />
+  </head>
+
+  <body id="app" v-cloak>
+    <!-- Vue 应用挂载点 -->
+  </body>
+
+  <script type="module">
+    import { createApp } from 'vue'
+    import { initApp } from './init'
+    import Apps from './views/Apps.vue'
+
+    const app = createApp(Apps)
+    initApp(app)
+  </script>
+</html>
