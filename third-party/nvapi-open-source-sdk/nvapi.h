@@ -33,6 +33,10 @@
 
 #pragma pack(push,8) // Make sure we have consistent structure packings
 
+#include "nvapi_lite_salstart.h"
+#include "nvapi_lite_common.h"
+#include "nvapi_lite_salstart.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
