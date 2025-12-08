@@ -3,8 +3,8 @@ name: Build and Release
 on:
   push:
     tags:
-      - 'v*'  # 仅在推送 v 开头的 tag 时触发构建和发布
-  workflow_dispatch:  # 保留手动触发选项
+      - 'v*'  
+  workflow_dispatch:  
 
 concurrency:
   group: '${{ github.workflow }}-${{ github.ref }}'
