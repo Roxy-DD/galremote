@@ -6,13 +6,14 @@
 # 4. 用签名文件重新打包 ZIP 便携版
 # 5. 用签名文件替换 NSIS staging 目录中的文件并重新打包
 # 6. 签名最终的 NSIS 安装包
-# 注意：只在正式发布（非预发布）时运行，确保代码版本和签名文件一致
+# 注意：此 workflow 需要配置 SignPath secrets，目前设为仅手动触发
 
 name: Sign and Repackage (Release Only)
 
 on:
-  release:
-    types: [published]
+  # 暂时禁用自动触发，因为需要配置 SignPath secrets
+  # release:
+  #   types: [published]
   workflow_dispatch:
     inputs:
       ref:
