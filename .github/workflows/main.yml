@@ -1,19 +1,10 @@
 name: Build and Release
 
 on:
-  pull_request:
-    branches:
-      - main
-    types:
-      - opened
-      - synchronize
-      - reopened
   push:
-    branches:
-      - main
     tags:
-      - 'v*'  # 推送以 v 开头的 tag 时触发发布
-  workflow_dispatch:
+      - 'v*'  # 仅在推送 v 开头的 tag 时触发构建和发布
+  workflow_dispatch:  # 保留手动触发选项
 
 concurrency:
   group: '${{ github.workflow }}-${{ github.ref }}'
