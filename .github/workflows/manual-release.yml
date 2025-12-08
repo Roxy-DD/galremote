@@ -1,0 +1,139 @@
+# 手动发布工作流
+# 从已有的构建 Artifact 下载产物并发布到 GitHub Release
+# 用途：避免重复构建，可以将之前构建的产物发布到新的 Release
+
+name: Manual Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      run-id:
+        description: "Workflow Run ID to download artifacts from (leave empty for latest successful build)"
+        required: false
+      release-tag:
+        description: "Release tag name (e.g., v1.0.3)"
+        required: true
+      release-name:
+        description: "Release name (leave empty to use tag name)"
+        required: false
+      prerelease:
+        description: "Mark as pre-release"
+        required: false
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+      draft:
+        description: "Create as draft"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "true"
+          - "false"
+
+jobs:
+  manual-release:
+    name: Manual Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 如果提供了 run-id，从指定的 run 下载
+      - name: Download specific artifact
+        if: ${{ github.event.inputs.run-id != '' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: sunshine-windows
+          path: artifacts
+          run-id: ${{ github.event.inputs.run-id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # 如果没有提供 run-id，从最近的成功构建下载
+      - name: Download latest artifact
+        if: ${{ github.event.inputs.run-id == '' }}
+        uses: dawidd6/action-download-artifact@v3
+        with:
+          workflow: main.yml
+          name: sunshine-windows
+          path: artifacts
+          check_artifacts: true
+          search_artifacts: true
+
+      - name: List downloaded files
+        run: |
+          echo "Downloaded artifacts:"
+          ls -lhR artifacts/
+
+      - name: Verify required files
+        run: |
+          echo "Verifying required files..."
+          
+          # 检查必需文件
+          INSTALLER=$(find artifacts -name "*.WindowsInstaller.exe" | head -n 1)
+          PORTABLE=$(find artifacts -name "*.WindowsPortable.zip" | head -n 1)
+          
+          if [ -z "$INSTALLER" ]; then
+            echo "Error: WindowsInstaller.exe not found!"
+            exit 1
+          fi
+          
+          if [ -z "$PORTABLE" ]; then
+            echo "Error: WindowsPortable.zip not found!"
+            exit 1
+          fi
+          
+          echo "✓ Found installer: $INSTALLER"
+          echo "✓ Found portable: $PORTABLE"
+          
+          # 检查可选文件
+          if [ -f "artifacts/SHA256SUMS.txt" ]; then
+            echo "✓ Found SHA256SUMS.txt"
+          fi
+          
+          if [ -f "artifacts/checksums.json" ]; then
+            echo "✓ Found checksums.json"
+          fi
+
+      - name: Prepare release files
+        id: prepare
+        run: |
+          mkdir -p release-files
+          
+          # 复制所有发布文件
+          cp artifacts/*.exe release-files/ 2>/dev/null || true
+          cp artifacts/*.zip release-files/ 2>/dev/null || true
+          cp artifacts/SHA256SUMS.txt release-files/ 2>/dev/null || true
+          cp artifacts/checksums.json release-files/ 2>/dev/null || true
+          
+          echo "Release files:"
+          ls -lh release-files/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.event.inputs.release-tag }}
+          name: ${{ github.event.inputs.release-name || github.event.inputs.release-tag }}
+          files: release-files/*
+          draft: ${{ github.event.inputs.draft == 'true' }}
+          prerelease: ${{ github.event.inputs.prerelease == 'true' }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Summary
+        run: |
+          echo "## Release Created" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tag**: ${{ github.event.inputs.release-tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Name**: ${{ github.event.inputs.release-name || github.event.inputs.release-tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Pre-release**: ${{ github.event.inputs.prerelease }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Draft**: ${{ github.event.inputs.draft }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Files" >> $GITHUB_STEP_SUMMARY
+          ls release-files/ | while read f; do echo "- \`$f\`" >> $GITHUB_STEP_SUMMARY; done

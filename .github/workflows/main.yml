@@ -79,6 +79,8 @@ jobs:
     name: Windows
     needs: setup_release
     runs-on: windows-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -283,12 +285,17 @@ jobs:
 
       - name: Create/Update GitHub Release
         if: needs.setup_release.outputs.publish_release == 'true'
-        uses: LizardByte/create-release-action@v2025.426.1549
+        uses: softprops/action-gh-release@v1
         with:
-          allowUpdates: true
-          body: ${{ needs.setup_release.outputs.release_body }}
-          generateReleaseNotes: ${{ needs.setup_release.outputs.release_generate_release_notes }}
+          tag_name: ${{ needs.setup_release.outputs.release_tag }}
           name: ${{ needs.setup_release.outputs.release_tag }}.杂鱼
+          body: ${{ needs.setup_release.outputs.release_body }}
+          generate_release_notes: ${{ needs.setup_release.outputs.release_generate_release_notes }}
           prerelease: true
-          tag: ${{ needs.setup_release.outputs.release_tag }}.杂鱼
-          token: ${{ secrets.GH_BOT_TOKEN }}
+          files: |
+            artifacts/Sunshine.*.WindowsInstaller.exe
+            artifacts/Sunshine.*.WindowsPortable.zip
+            artifacts/SHA256SUMS.txt
+            artifacts/checksums.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
