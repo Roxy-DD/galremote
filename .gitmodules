@@ -72,5 +72,5 @@
 	branch = master
 [submodule "src_assets/common/sunshine-control-panel"]
 	path = src_assets/common/sunshine-control-panel
-	url = https://github.com/qiin2333/sunshine-control-panel.git
-	branch = master
+	url = https://github.com/Roxy-DD/galremote-control-panel.git
+	branch = main
