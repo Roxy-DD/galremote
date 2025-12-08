@@ -599,7 +599,12 @@ async fn fetch_and_proxy(
     let mut res = axum::http::Response::builder().status(status.as_u16());
     
     for (key, value) in resp_headers.iter() {
-        if !matches!(key.as_str(), "content-length" | "transfer-encoding" | "content-encoding") {
+        let key_str = key.as_str().to_lowercase();
+        // 过滤掉可能阻止 iframe 加载的安全头
+        if !matches!(key_str.as_str(), 
+            "content-length" | "transfer-encoding" | "content-encoding" |
+            "x-frame-options" | "content-security-policy"
+        ) {
             res = res.header(key, value);
         }
     }
