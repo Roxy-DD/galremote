@@ -3,14 +3,14 @@ name: Build and Release
 on:
   pull_request:
     branches:
-      - main
+      - master
     types:
       - opened
       - synchronize
       - reopened
   push:
     branches:
-      - main
+      - master
   workflow_dispatch:
 
 concurrency:
@@ -38,7 +38,7 @@ jobs:
       release_tag: ${{ steps.setup_release_auto.outputs.release_tag || steps.setup_release_manual.outputs.release_tag }}
       release_version: ${{ steps.setup_release_auto.outputs.release_version || steps.setup_release_manual.outputs.release_version }}
     permissions:
-      contents: write  # read does not work to check squash and merge details
+      contents: write # read does not work to check squash and merge details
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -139,12 +139,12 @@ jobs:
         shell: msys2 {0}
         run: |
           echo "Installing Rust via rustup..."
-          
+
           # Rust installs to Windows user directory
           WINDOWS_USER=$(cmd //c "echo %USERNAME%" | tr -d '\r')
           CARGO_BIN="/c/Users/${WINDOWS_USER}/.cargo/bin"
           export PATH="$CARGO_BIN:$PATH"
-          
+
           # Check if cargo already exists
           if command -v cargo &> /dev/null; then
             echo "Rust already installed: $(cargo --version)"
@@ -152,11 +152,11 @@ jobs:
             # Download and install rustup
             curl --proto '=https' --tlsv1.2 -sSf https://win.rustup.rs/x86_64 -o /tmp/rustup-init.exe
             /tmp/rustup-init.exe -y --default-toolchain stable --profile minimal
-            
+
             # Refresh PATH
             sleep 3
             export PATH="$CARGO_BIN:$PATH"
-            
+
             # Verify installation
             if [ -f "$CARGO_BIN/cargo.exe" ]; then
               echo "Rust installed successfully: $(cargo --version)"
@@ -173,14 +173,14 @@ jobs:
           which cmake || (echo "cmake not found" && exit 1)
           which ninja || (echo "ninja not found" && exit 1)
           which gcc || (echo "gcc not found" && exit 1)
-          
+
           # verify Rust is in PATH
           WINDOWS_USER=$(cmd //c "echo %USERNAME%" | tr -d '\r')
           CARGO_BIN="/c/Users/${WINDOWS_USER}/.cargo/bin"
           export PATH="$CARGO_BIN:$PATH"
-          
+
           which cargo || (echo "cargo not found" && exit 1)
-          
+
           echo "All build tools verified successfully"
           echo "  CMake: $(cmake --version | head -1)"
           echo "  Ninja: $(ninja --version)"
@@ -198,7 +198,7 @@ jobs:
           WINDOWS_USER=$(cmd //c "echo %USERNAME%" | tr -d '\r')
           CARGO_BIN="/c/Users/${WINDOWS_USER}/.cargo/bin"
           export PATH="$CARGO_BIN:$PATH"
-          
+
           mkdir -p build
           cmake \
             -B build \
@@ -210,7 +210,6 @@ jobs:
             -DSUNSHINE_PUBLISHER_WEBSITE='https://github.com/qiin2333/Sunshine-Foundation' \
             -DSUNSHINE_PUBLISHER_ISSUE_URL='https://github.com/qiin2333/Sunshine-Foundation/issues'
           ninja -C build
-          ninja -C build sunshine-control-panel
 
       - name: Package Windows
         shell: msys2 {0}

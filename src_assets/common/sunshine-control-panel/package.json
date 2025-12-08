@@ -21,7 +21,7 @@
     "url": "https://github.com/qiin2333"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2.8.4",
+    "@tauri-apps/cli": "^2.9.5",
     "@vitejs/plugin-vue": "^4.5.1",
     "cross-env": "^7.0.3",
     "less": "^4.2.2",
