@@ -6,9 +6,9 @@ mod manual_tests {
     #[tokio::test]
     async fn test_aliyun_oss_manual() {
         let endpoint = "https://oss-cn-chengdu.aliyuncs.com"; // Correct endpoint format
-        let bucket = "siyuan-roxy";
-        let access_key_id = "LTAI5tSfoAJhrnAtEoscHAG8";
-        let access_key_secret = "ns67BUH02mdOIAfoAXazB2ZezrsZIO";
+        let bucket = "your-backet-name";
+        let access_key_id = "your-access-key-id";
+        let access_key_secret = "your-access-key-secret";
 
         let builder = services::Oss::default()
             .endpoint(endpoint)

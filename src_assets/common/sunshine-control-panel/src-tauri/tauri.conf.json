@@ -24,7 +24,7 @@
   "app": {
     "windows": [],
     "security": {
-      "csp": "default-src 'self' asset: data: blob: filesystem: 'unsafe-inline' 'unsafe-eval' ipc: http://* https://* tauri:;",
+      "csp": null,
       "capabilities": [
         {
           "identifier": "default",

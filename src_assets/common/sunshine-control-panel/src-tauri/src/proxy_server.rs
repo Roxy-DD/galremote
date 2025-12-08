@@ -542,15 +542,23 @@ async fn send_request(
         _ => client.get(url),
     };
     
-    // 复制请求头（排除特殊头部）
+    // 复制请求头（排除特殊头部和源相关头部）
     for (key, value) in headers.iter() {
         let key_str = key.as_str();
-        if !matches!(key_str, "host" | "connection" | "content-length" | "transfer-encoding") {
+        if !matches!(key_str, "host" | "connection" | "content-length" | "transfer-encoding" | "origin" | "referer") {
             if let Ok(value_str) = value.to_str() {
                 req_builder = req_builder.header(key_str, value_str);
             }
         }
     }
+
+    // 重写 Origin 和 Referer 以欺骗后端（防止 CSRF/跨域阻止）
+    if let Ok(target_url_obj) = url::Url::parse(url) {
+        let origin = target_url_obj.origin().ascii_serialization();
+        req_builder = req_builder.header("Origin", &origin);
+        req_builder = req_builder.header("Referer", url);
+    }
+    
     
     if !body.is_empty() {
         req_builder = req_builder.body(body.to_vec());
@@ -603,7 +611,10 @@ async fn fetch_and_proxy(
         // 过滤掉可能阻止 iframe 加载的安全头
         if !matches!(key_str.as_str(), 
             "content-length" | "transfer-encoding" | "content-encoding" |
-            "x-frame-options" | "content-security-policy"
+            "x-frame-options" | "content-security-policy" | "content-security-policy-report-only" |
+            "strict-transport-security" | "permissions-policy" |
+            "cross-origin-embedder-policy" | "cross-origin-opener-policy" | "cross-origin-resource-policy" |
+            "x-content-type-options"
         ) {
             res = res.header(key, value);
         }
