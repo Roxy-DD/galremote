@@ -19,6 +19,10 @@
         </h1>
         <p class="page-subtitle">{{ $t('index.description') }}</p>
       </div>
+      <!-- 资源卡片 -->
+      <div class="my-4">
+        <ResourceCard />
+      </div>
 
       <!-- 错误日志 -->
       <ErrorLogs :fatal-logs="fatalLogs" />
@@ -38,10 +42,6 @@
         :parsed-pre-release-body="parsedPreReleaseBody"
       />
 
-      <!-- 资源卡片 -->
-      <div class="my-4">
-        <ResourceCard />
-      </div>
     </div>
   </div>
 </template>

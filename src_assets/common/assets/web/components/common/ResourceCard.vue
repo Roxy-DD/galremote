@@ -133,14 +133,14 @@
             <div class="col-12">
               <a
                 class="resource-link resource-link-github"
-                href="https://github.com/qiin2333/Sunshine-Foundation"
+                href="https://github.com/Roxy-DD/galremote"
                 target="_blank"
               >
                 <div class="resource-icon">
                   <i class="fab fa-github"></i>
                 </div>
                 <div class="resource-content">
-                  <span class="resource-title">Sunshine Foundation</span>
+                  <span class="resource-title">GalRemote</span>
                   <span class="resource-desc">Star & Fork 支持项目发展</span>
                 </div>
                 <i class="fas fa-star resource-arrow text-warning"></i>
