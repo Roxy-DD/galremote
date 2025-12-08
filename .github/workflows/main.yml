@@ -24,14 +24,14 @@ jobs:
   setup_release:
     name: Setup Release
     outputs:
-      publish_release: ${{ steps.setup_release_tag.outputs.publish_release || steps.setup_release_auto.outputs.publish_release || steps.setup_release_manual.outputs.publish_release }}
-      release_body: ${{ steps.setup_release_tag.outputs.release_body || steps.setup_release_auto.outputs.release_body || steps.setup_release_manual.outputs.release_body }}
-      release_commit: ${{ steps.setup_release_tag.outputs.release_commit || steps.setup_release_auto.outputs.release_commit || steps.setup_release_manual.outputs.release_commit }}
-      release_generate_release_notes: ${{ steps.setup_release_tag.outputs.release_generate_release_notes || steps.setup_release_auto.outputs.release_generate_release_notes || steps.setup_release_manual.outputs.release_generate_release_notes }}
-      release_tag: ${{ steps.setup_release_tag.outputs.release_tag || steps.setup_release_auto.outputs.release_tag || steps.setup_release_manual.outputs.release_tag }}
-      release_version: ${{ steps.setup_release_tag.outputs.release_version || steps.setup_release_auto.outputs.release_version || steps.setup_release_manual.outputs.release_version }}
+      publish_release: ${{ steps.setup_release_auto.outputs.publish_release || steps.setup_release_manual.outputs.publish_release }}
+      release_body: ${{ steps.setup_release_auto.outputs.release_body || steps.setup_release_manual.outputs.release_body }}
+      release_commit: ${{ steps.setup_release_auto.outputs.release_commit || steps.setup_release_manual.outputs.release_commit }}
+      release_generate_release_notes: ${{ steps.setup_release_auto.outputs.release_generate_release_notes || steps.setup_release_manual.outputs.release_generate_release_notes }}
+      release_tag: ${{ steps.setup_release_auto.outputs.release_tag || steps.setup_release_manual.outputs.release_tag }}
+      release_version: ${{ steps.setup_release_auto.outputs.release_version || steps.setup_release_manual.outputs.release_version }}
     permissions:
-      contents: write # read does not work to check squash and merge details
+      contents: write  # read does not work to check squash and merge details
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -44,7 +44,7 @@ jobs:
 
       - name: Setup Release (Auto)
         id: setup_release_auto
-        if: github.event_name != 'workflow_dispatch' && !startsWith(github.ref, 'refs/tags/')
+        if: github.event_name != 'workflow_dispatch'
         uses: LizardByte/setup-release-action@v2025.426.225
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -60,19 +60,6 @@ jobs:
           echo "release_generate_release_notes=false" >> $GITHUB_OUTPUT
           echo "release_tag=manual-$(date +%Y%m%d-%H%M%S)" >> $GITHUB_OUTPUT
           echo "release_version=manual-$(date +%Y%m%d-%H%M%S)" >> $GITHUB_OUTPUT
-
-      - name: Setup Release (Tag)
-        id: setup_release_tag
-        if: startsWith(github.ref, 'refs/tags/v')
-        run: |
-          # 从 tag 获取版本信息并发布
-          TAG_NAME=${GITHUB_REF#refs/tags/}
-          echo "publish_release=true" >> $GITHUB_OUTPUT
-          echo "release_body=" >> $GITHUB_OUTPUT
-          echo "release_commit=${{ github.sha }}" >> $GITHUB_OUTPUT
-          echo "release_generate_release_notes=true" >> $GITHUB_OUTPUT
-          echo "release_tag=${TAG_NAME}" >> $GITHUB_OUTPUT
-          echo "release_version=${TAG_NAME#v}" >> $GITHUB_OUTPUT
 
   build_win:
     name: Windows
@@ -145,12 +132,12 @@ jobs:
         shell: msys2 {0}
         run: |
           echo "Installing Rust via rustup..."
-
+          
           # Rust installs to Windows user directory
           WINDOWS_USER=$(cmd //c "echo %USERNAME%" | tr -d '\r')
           CARGO_BIN="/c/Users/${WINDOWS_USER}/.cargo/bin"
           export PATH="$CARGO_BIN:$PATH"
-
+          
           # Check if cargo already exists
           if command -v cargo &> /dev/null; then
             echo "Rust already installed: $(cargo --version)"
@@ -158,11 +145,11 @@ jobs:
             # Download and install rustup
             curl --proto '=https' --tlsv1.2 -sSf https://win.rustup.rs/x86_64 -o /tmp/rustup-init.exe
             /tmp/rustup-init.exe -y --default-toolchain stable --profile minimal
-
+            
             # Refresh PATH
             sleep 3
             export PATH="$CARGO_BIN:$PATH"
-
+            
             # Verify installation
             if [ -f "$CARGO_BIN/cargo.exe" ]; then
               echo "Rust installed successfully: $(cargo --version)"
@@ -179,14 +166,14 @@ jobs:
           which cmake || (echo "cmake not found" && exit 1)
           which ninja || (echo "ninja not found" && exit 1)
           which gcc || (echo "gcc not found" && exit 1)
-
+          
           # verify Rust is in PATH
           WINDOWS_USER=$(cmd //c "echo %USERNAME%" | tr -d '\r')
           CARGO_BIN="/c/Users/${WINDOWS_USER}/.cargo/bin"
           export PATH="$CARGO_BIN:$PATH"
-
+          
           which cargo || (echo "cargo not found" && exit 1)
-
+          
           echo "All build tools verified successfully"
           echo "  CMake: $(cmake --version | head -1)"
           echo "  Ninja: $(ninja --version)"
@@ -204,7 +191,7 @@ jobs:
           WINDOWS_USER=$(cmd //c "echo %USERNAME%" | tr -d '\r')
           CARGO_BIN="/c/Users/${WINDOWS_USER}/.cargo/bin"
           export PATH="$CARGO_BIN:$PATH"
-
+          
           mkdir -p build
           cmake \
             -B build \
@@ -287,7 +274,7 @@ jobs:
           allowUpdates: true
           body: ${{ needs.setup_release.outputs.release_body }}
           generateReleaseNotes: ${{ needs.setup_release.outputs.release_generate_release_notes }}
-          name: ${{ needs.setup_release.outputs.release_tag }}
+          name: ${{ needs.setup_release.outputs.release_tag }}.杂鱼
           prerelease: true
-          tag: ${{ needs.setup_release.outputs.release_tag }}
+          tag: ${{ needs.setup_release.outputs.release_tag }}.杂鱼
           token: ${{ secrets.GH_BOT_TOKEN }}
