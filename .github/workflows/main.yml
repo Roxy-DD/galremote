@@ -3,14 +3,16 @@ name: Build and Release
 on:
   pull_request:
     branches:
-      - master
+      - main
     types:
       - opened
       - synchronize
       - reopened
   push:
     branches:
-      - master
+      - main
+    tags:
+      - 'v*'  # 推送以 v 开头的 tag 时触发发布
   workflow_dispatch:
 
 concurrency:
@@ -31,12 +33,12 @@ jobs:
   setup_release:
     name: Setup Release
     outputs:
-      publish_release: ${{ steps.setup_release_auto.outputs.publish_release || steps.setup_release_manual.outputs.publish_release }}
-      release_body: ${{ steps.setup_release_auto.outputs.release_body || steps.setup_release_manual.outputs.release_body }}
-      release_commit: ${{ steps.setup_release_auto.outputs.release_commit || steps.setup_release_manual.outputs.release_commit }}
-      release_generate_release_notes: ${{ steps.setup_release_auto.outputs.release_generate_release_notes || steps.setup_release_manual.outputs.release_generate_release_notes }}
-      release_tag: ${{ steps.setup_release_auto.outputs.release_tag || steps.setup_release_manual.outputs.release_tag }}
-      release_version: ${{ steps.setup_release_auto.outputs.release_version || steps.setup_release_manual.outputs.release_version }}
+      publish_release: ${{ steps.setup_release_tag.outputs.publish_release || steps.setup_release_auto.outputs.publish_release || steps.setup_release_manual.outputs.publish_release }}
+      release_body: ${{ steps.setup_release_tag.outputs.release_body || steps.setup_release_auto.outputs.release_body || steps.setup_release_manual.outputs.release_body }}
+      release_commit: ${{ steps.setup_release_tag.outputs.release_commit || steps.setup_release_auto.outputs.release_commit || steps.setup_release_manual.outputs.release_commit }}
+      release_generate_release_notes: ${{ steps.setup_release_tag.outputs.release_generate_release_notes || steps.setup_release_auto.outputs.release_generate_release_notes || steps.setup_release_manual.outputs.release_generate_release_notes }}
+      release_tag: ${{ steps.setup_release_tag.outputs.release_tag || steps.setup_release_auto.outputs.release_tag || steps.setup_release_manual.outputs.release_tag }}
+      release_version: ${{ steps.setup_release_tag.outputs.release_version || steps.setup_release_auto.outputs.release_version || steps.setup_release_manual.outputs.release_version }}
     permissions:
       contents: write # read does not work to check squash and merge details
     runs-on: ubuntu-latest
@@ -67,6 +69,19 @@ jobs:
           echo "release_generate_release_notes=false" >> $GITHUB_OUTPUT
           echo "release_tag=manual-$(date +%Y%m%d-%H%M%S)" >> $GITHUB_OUTPUT
           echo "release_version=manual-$(date +%Y%m%d-%H%M%S)" >> $GITHUB_OUTPUT
+
+      - name: Setup Release (Tag)
+        id: setup_release_tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          # 从 tag 获取版本信息并发布
+          TAG_NAME=${GITHUB_REF#refs/tags/}
+          echo "publish_release=true" >> $GITHUB_OUTPUT
+          echo "release_body=" >> $GITHUB_OUTPUT
+          echo "release_commit=${{ github.sha }}" >> $GITHUB_OUTPUT
+          echo "release_generate_release_notes=true" >> $GITHUB_OUTPUT
+          echo "release_tag=${TAG_NAME}" >> $GITHUB_OUTPUT
+          echo "release_version=${TAG_NAME#v}" >> $GITHUB_OUTPUT
 
   build_win:
     name: Windows
@@ -280,7 +295,7 @@ jobs:
           allowUpdates: true
           body: ${{ needs.setup_release.outputs.release_body }}
           generateReleaseNotes: ${{ needs.setup_release.outputs.release_generate_release_notes }}
-          name: ${{ needs.setup_release.outputs.release_tag }}.杂鱼
+          name: ${{ needs.setup_release.outputs.release_tag }}
           prerelease: true
-          tag: ${{ needs.setup_release.outputs.release_tag }}.杂鱼
+          tag: ${{ needs.setup_release.outputs.release_tag }}
           token: ${{ secrets.GH_BOT_TOKEN }}
