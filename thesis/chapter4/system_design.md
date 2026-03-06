@@ -72,13 +72,13 @@ graph TB
 
 ```mermaid
 sequenceDiagram
-    participant Mobile as 手机端 (Moonlight)
+    participant Client as 移动端 (Moonlight/Web端等)
     participant Cpp as C++ 串流引擎
     participant WinAPI as Windows 底层 API (Ring 0)
     
-    Mobile->>Cpp: 建立握手 (报告触摸/手柄 Layout)
+    Client->>Cpp: 建立握手 (报告触摸/手柄 Layout)
     loop 每秒 100 帧+
-        Mobile->>Cpp: 发送触控/陀螺仪数据流
+        Client->>Cpp: 发送触控/陀螺仪数据流
         Cpp->>Cpp: 解包为坐标与按键电平 (x, y, Button)
         alt 纯触控模式
             Cpp->>WinAPI: InjectSyntheticPointerInput (绝对坐标注入)
