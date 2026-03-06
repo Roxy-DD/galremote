@@ -158,37 +158,49 @@ stateDiagram-v2
 
 ---
 
-## 4.5 本地持久化存储设计与 ER 模型
+## 4.5 本地持久化存储与非关系型映射设计
 
-出于低耗和免安装的需求（非功能性指标），系统摒弃了庞大的关系型数据库驻留，全部采用基于 `Serde` 的强类型 JSON 文件序列化，其核心实体关系 (ER) 结构如下：
+出于系统对主机的“极低侵入性”（零依赖、免安装）与极低资源开销的非功能性指标考量，本系统在架构树级摒弃了传统的 SQLite 或 MySQL 等重量级关系型数据库解决方案，转而采用了基于 Rust `serde_json` 的强类型 JSON 序列化技术。
+
+为保证在前端状态树（如 Vuex/Pinia）与后端 Rust 结构体、物理文件之间的数据一致性，系统规划了以下非关系型（NoSQL）文档的**核心实体关系 (Entity-Relationship) 模型**：
 
 ```mermaid
 erDiagram
     GAME {
-        string ID PK "UUID或VNDB_ID"
+        string ID PK "游戏唯一标识符(UUID/VNDB_ID)"
         string Title "游戏展示头衔"
         string ExecutablePath "提取或挂载镜像后的启动路由"
         string CoverUrl "异步下载封面的本地缓存路径"
+        boolean SyncEnabled "是否激活该记录的云端同步"
     }
     PLAY_STATS {
-        string GameID FK "外键绑定游戏"
+        string GameID FK "外键绑定游戏实体"
         int TotalPlayTime "累计挂机/游玩秒数"
-        int LastPlayedTime "最后活跃时间戳"
+        int LastPlayedTime "最后活跃周期(Unix时间戳)"
     }
     CLOUD_BACKEND {
         string ID PK "云存储商UUID"
-        string Type "WebDAV/S3/MinIO协议类型"
-        string Endpoint "挂载点"
+        string Type "WebDAV/S3/MinIO/Local"
+        string Endpoint "网络挂载点或鉴权路由"
+        string AuthToken "加密存储的流传输令牌"
     }
-    SNAPSHOT {
-        string ID PK "版本哈希"
-        string GameID FK
-        string ArchivePath "被Zlib化之后的物理备份路径"
+    SNAPSHOT_LOG {
+        string HashID PK "版本散列哈希(SHA-256)"
+        string GameID FK "从属游戏"
+        string ArchivePath "被Zlib化之后存储的物理备份路径"
+        string SyncStrategy "LWW覆写或双向保留标记"
     }
 
-    GAME ||--o{ PLAY_STATS : "关联游玩时长统计"
-    GAME ||--o{ SNAPSHOT : "产生防御性破坏的快照版本"
-    CLOUD_BACKEND ||--o{ GAME : "承载跨端游戏状态字典"
+    GAME ||--o{ PLAY_STATS : "高频监控挂载"
+    GAME ||--o{ SNAPSHOT_LOG : "历史防丢档快照"
+    CLOUD_BACKEND ||--o{ GAME : "承载跨端游戏状态字典与槽位"
 ```
 
-为避免高频的心跳统计写坏静态的游戏元数据，系统将 `GAME` 的静态描述与 `PLAY_STATS` 的动态追踪分成了两个独立的 JSON 字典（`galgames.config.json` 与 `play_stats.json`），在应用层通过内存引用的方式实现联表逻辑，保证了原子性与高吞吐。
+### 4.5.1 领域驱动设计下的冷热分离策略
+
+在工程落地中，为了避免高频的“心跳追踪机制”（每秒更新游玩时长）引发磁盘 IO 风暴乃至写坏包含复杂属性的静态游戏元数据，本系统将大型结构体进行了**严格的冷热隔离**：
+
+1. **静态配置流 (冷数据)**：`GAME` 的核心展现描述剥离为只读频率极高的配置文件（`galgames.config.json`），仅在刮削器更新或用户修改路径时发生落盘写操作。
+2. **动态日志流 (热数据)**：`PLAY_STATS` 游玩统计独立映射为 `play_stats.json`，在系统推流挂钩时由 Rust 的后台线程以 5 分钟的步长或进程退出时进行防抖写出。
+
+两份数据字典在 Tauri 中台的内存堆中进行“伪联表”（Pointer Reference），既保证了读取的高吞吐，又杜绝了存储层面的“脏写”与原子性被破坏的风险。
