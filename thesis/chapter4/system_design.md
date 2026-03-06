@@ -12,14 +12,14 @@
 
 ```mermaid
 graph TB
-    subgraph Presentation Layer [展现层: Vue 3 + Desktop UI]
+    subgraph PresentationLayer [展现层: Vue 3 + Desktop UI]
         UI_Dash("仪表盘")
         UI_Gal("Galgame管理器")
         UI_VDD("虚拟显示器设置")
         UI_Sync("云同步工具")
     end
 
-    subgraph Middleware Layer [中台层: Tauri Rust Backend]
+    subgraph MiddlewareLayer [中台层: Tauri Rust Backend]
         Axum("Axum 跨域代理服务")
         SysMgr("进程与托盘接管")
         VNDB_Scraper("VNDB API 刮削器")
@@ -28,7 +28,7 @@ graph TB
         File_IO("异步文件系统")
     end
 
-    subgraph Core Engine Layer [核心层: C++ Streaming Engine]
+    subgraph CoreEngineLayer [核心层: C++ Streaming Engine]
         Video_Encode("DXGI/Wayland 捕获与硬件编码")
         Input_Inject("ViGEm 虚拟手柄/触控注入")
         RTSP_Server("RTSP/Moonlight 协议栈")
@@ -42,7 +42,7 @@ graph TB
     UI_Sync -->|Tauri IPC| Cloud_Sync
 
     Axum -.->|配置分发| RTSP_Server
-    SysMgr ==>|伴随启动/心跳监控| Core Engine Layer
+    SysMgr ==>|伴随启动/心跳监控| CoreEngineLayer
     VDD_Mgr -.->|改变物理环境| Video_Encode
 ```
 
