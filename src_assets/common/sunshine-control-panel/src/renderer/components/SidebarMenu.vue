@@ -212,15 +212,7 @@
         <VddSettings v-if="showVddSettings" @close="showVddSettings = false" />
         <GalgameManager v-else-if="showGalgameManager" ref="galgameManagerRef" />
         <ToolsPage v-else-if="showToolsPage" ref="toolsPageRef" :initial-tool="currentToolType" />
-        <UpdateDialog
-          v-if="showUpdateDialog"
-          v-model="showUpdateDialog"
-          :update-info="updateInfo"
-          :current-version="currentVersion"
-          @close="showUpdateDialog = false"
-          @skip-version="handleSkipVersion"
-        />
-        <slot v-if="!showVddSettings && !showGalgameManager && !showToolsPage && !showUpdateDialog"></slot>
+        <slot v-if="!showVddSettings && !showGalgameManager && !showToolsPage"></slot>
       </div>
     </div>
   </div>
@@ -229,7 +221,6 @@
 <script setup>
 import { ref, nextTick } from 'vue'
 import VddSettings from './VddSettings.vue'
-import UpdateDialog from './UpdateDialog.vue'
 import GalgameManager from './GalgameManager.vue'
 import ToolsPage from './ToolsPage.vue'
 import { useSidebarState } from '../composables/useSidebarState.js'
@@ -240,7 +231,6 @@ import {
   Delete,
   RefreshRight,
   Refresh,
-  Link,
   Setting,
   CopyDocument,
   Timer,
@@ -248,13 +238,9 @@ import {
   Cpu,
   Minus,
   Close,
-  FullScreen,
-  DArrowLeft,
-  DArrowRight,
   Sunny,
   Moon,
   Key,
-  Download,
   Folder,
   Upload,
 } from '@element-plus/icons-vue'
@@ -266,13 +252,9 @@ const {
   isMaximized,
   isAdmin,
   showVddSettings,
-  showUpdateDialog,
-  updateInfo,
-  currentVersion,
   toggleTheme,
   toggleCollapse,
   openVddSettings,
-  skipVersion,
 } = useSidebarState()
 
 const { minimizeWindow, toggleMaximize, closeWindow } = useWindowControls(isMaximized)
@@ -281,14 +263,9 @@ const {
   uninstallVdd,
   restartDriver,
   restartSunshine,
-  openTimer,
-  openDelayTester,
-  openGamepadTester,
   openClipboardSync,
-  openUrl,
   cleanupCovers,
   restartAsAdmin,
-  checkForUpdates,
 } = useTools()
 
 // Galgame Manager state
@@ -333,20 +310,6 @@ const openCloudSettings = () => {
       galgameManagerRef.value.showCloudSettings = true
     }
   }, 100)
-}
-
-// 处理检查更新的结果
-const handleCheckForUpdates = async () => {
-  const result = await checkForUpdates()
-  if (result) {
-    updateInfo.value = result
-    showUpdateDialog.value = true
-  }
-}
-
-// 处理忽略版本
-const handleSkipVersion = (version) => {
-  skipVersion(version)
 }
 
 // 暴露方法供父组件调用

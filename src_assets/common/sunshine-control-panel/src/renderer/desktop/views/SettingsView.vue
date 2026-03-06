@@ -146,18 +146,6 @@
           </div>
         </div>
 
-        <div class="setting-item">
-          <div class="setting-info">
-            <div class="setting-name">更新通知</div>
-            <div class="setting-desc">有新版本时通知</div>
-          </div>
-          <div class="setting-control">
-            <label class="switch">
-              <input type="checkbox" v-model="settings.updateNotify" />
-              <span class="slider"></span>
-            </label>
-          </div>
-        </div>
       </div>
     </div>
 
@@ -203,20 +191,12 @@
     <!-- 关于 -->
     <div class="desktop-card about-card fade-in">
       <div class="about-content">
-        <div class="about-logo">☀️</div>
+        <div class="about-logo">🎮</div>
         <div class="about-info">
-          <div class="about-name">Sunshine Desktop</div>
-          <div class="about-version">版本 0.2.5</div>
-          <div class="about-links">
-            <a href="#" @click.prevent="openLink('github')">GitHub</a>
-            <span>•</span>
-            <a href="#" @click.prevent="openLink('docs')">文档</a>
-            <span>•</span>
-            <a href="#" @click.prevent="openLink('discord')">Discord</a>
-          </div>
+          <div class="about-name">GalRemote Desktop</div>
+          <div class="about-version">当前分支构建</div>
         </div>
       </div>
-      <button class="desktop-btn" @click="checkUpdate">检查更新</button>
     </div>
 
     <!-- 保存按钮 -->
@@ -239,7 +219,6 @@ const settings = ref({
   autoStartSunshine: true,
   notifications: true,
   connectionNotify: true,
-  updateNotify: true,
   devMode: false,
   logLevel: 'info',
 })
@@ -263,7 +242,6 @@ function resetSettings() {
     autoStartSunshine: true,
     notifications: true,
     connectionNotify: true,
-    updateNotify: true,
     devMode: false,
     logLevel: 'info',
   }
@@ -274,19 +252,6 @@ function saveSettings() {
   console.log('Saving settings:', settings.value)
 }
 
-function openLink(type) {
-  const urls = {
-    github: 'https://github.com/LizardByte/Sunshine',
-    docs: 'https://docs.lizardbyte.dev/projects/sunshine/',
-    discord: 'https://discord.gg/lizardbyte',
-  }
-  window.open(urls[type], '_blank')
-}
-
-function checkUpdate() {
-  // TODO: 检查更新
-  console.log('Checking for updates...')
-}
 </script>
 
 <style lang="less" scoped>

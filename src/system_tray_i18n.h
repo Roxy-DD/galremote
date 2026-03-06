@@ -19,10 +19,6 @@ namespace system_tray_i18n {
   extern const std::string KEY_CHINESE;
   extern const std::string KEY_ENGLISH;
   extern const std::string KEY_JAPANESE;
-  extern const std::string KEY_STAR_PROJECT;
-  extern const std::string KEY_HELP_US;
-  extern const std::string KEY_DEVELOPER_YUNDI339;
-  extern const std::string KEY_DEVELOPER_QIIN;
   extern const std::string KEY_RESET_DISPLAY_DEVICE_CONFIG;
   extern const std::string KEY_RESTART;
   extern const std::string KEY_QUIT;

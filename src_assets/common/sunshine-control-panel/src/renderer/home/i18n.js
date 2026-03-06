@@ -5,7 +5,7 @@
 
 export const translations = {
   zh: {
-    title: 'Sunshine 基地版',
+    title: 'GalRemote',
     tagline: '让游戏串流更优雅',
     subtitle: 'Sunshine, a self-hosted game-stream host for Moonlight, now features an HDR-friendly fork that integrates virtual displays and control panels.',
     nav: {
@@ -56,7 +56,7 @@ export const translations = {
       ]
     },
     download: {
-      title: '📥 下载 Sunshine 基地版',
+      title: '📥 下载 GalRemote',
       latestVersion: '最新版本',
       checkUpdate: '检查更新',
       checking: '正在检查最新版本...',
@@ -104,14 +104,14 @@ export const translations = {
       qqGroupDesc: '加入社区获取帮助'
     },
     footer: {
-      title: 'Sunshine 基地版',
+      title: 'GalRemote',
       subtitle: '让游戏串流更优雅',
       links: '相关链接',
-      copyright: '© 2024 Sunshine 基地版. 基于 LizardByte/Sunshine 修改.'
+      copyright: '© 2026 GalRemote Independent Branch'
     }
   },
   en: {
-    title: 'Sunshine Foundation',
+    title: 'GalRemote',
     tagline: 'Make Game Streaming Greater',
     subtitle: 'Sunshine, a self-hosted game-stream host for Moonlight, now features an HDR-friendly fork that integrates virtual displays and control panels.',
     nav: {
@@ -162,7 +162,7 @@ export const translations = {
       ]
     },
     download: {
-      title: '📥 Download Sunshine Foundation',
+      title: '📥 Download GalRemote',
       latestVersion: 'Latest Version',
       checkUpdate: 'Check Update',
       checking: 'Checking latest version...',
@@ -210,10 +210,10 @@ export const translations = {
       qqGroupDesc: 'Join the community for help'
     },
     footer: {
-      title: 'Sunshine Foundation',
+      title: 'GalRemote',
       subtitle: 'Make Game Streaming Greater',
       links: 'Links',
-      copyright: '© 2024 Sunshine Foundation. Modified from LizardByte/Sunshine.'
+      copyright: '© 2026 GalRemote Independent Branch'
     }
   }
 }

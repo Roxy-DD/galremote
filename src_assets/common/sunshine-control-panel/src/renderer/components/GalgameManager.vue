@@ -8,7 +8,7 @@
           <el-icon><Search /></el-icon>
           扫描存档
         </el-button>
-        <el-button @click="showAddGameDialog = true">
+        <el-button @click="openAddGameDialog">
           <el-icon><Plus /></el-icon>
           添加游戏
         </el-button>
@@ -74,8 +74,8 @@
                 <el-icon><DocumentAdd /></el-icon>
               </el-button>
             </el-tooltip>
-            <el-tooltip content="启动游戏" placement="top">
-              <el-button size="small" circle type="success" @click.stop="launchGame(game)">
+            <el-tooltip :content="canLaunch(game) ? '启动游戏' : '未配置启动路径'" placement="top">
+              <el-button size="small" circle type="success" :disabled="!canLaunch(game)" @click.stop="launchGame(game)">
                 <el-icon><VideoPlay /></el-icon>
               </el-button>
             </el-tooltip>
@@ -188,7 +188,7 @@
     </el-drawer>
 
     <!-- 添加/编辑游戏对话框 -->
-    <el-dialog v-model="showAddGameDialog" :title="editingGame ? '编辑游戏' : '添加游戏'" width="550px">
+    <el-dialog v-model="showAddGameDialog" :title="editingGame ? '编辑游戏' : '添加游戏'" width="550px" @closed="handleGameDialogClosed">
       <el-form :model="newGame" label-width="100px" label-position="left">
         <el-form-item label="游戏名称" required>
           <el-input v-model="newGame.name" placeholder="输入游戏名称" />
@@ -234,7 +234,7 @@
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="showAddGameDialog = false">取消</el-button>
+        <el-button @click="closeAddGameDialog">取消</el-button>
         <el-button type="primary" @click="addGame">{{ editingGame ? '保存' : '添加' }}</el-button>
       </template>
     </el-dialog>
@@ -429,7 +429,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { invoke, convertFileSrc } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { open } from '@tauri-apps/plugin-dialog'
@@ -454,8 +454,10 @@ const showScanResults = ref(false)
 const showCloudSettings = ref(false)
 const scanCandidates = ref([])
 const editingGame = ref(null)
+const editingOriginalName = ref(null)
 const coverCache = ref({})
 const filterStatus = ref('All')
+const unlistenFns = []
 
 const filteredGames = computed(() => {
   let result = games.value
@@ -466,25 +468,23 @@ const filteredGames = computed(() => {
   return result
 })
 
-const newGame = ref({
+const createEmptyGameForm = () => ({
   name: '',
   savePath: '',
   pathType: 'Folder',
   backupMode: 'manual',
   backupInterval: 60,
   exePath: '',
-  coverImage: ''
+  coverImage: '',
 })
+
+const newGame = ref(createEmptyGameForm())
 
 const cloudSettings = ref({
   type: 'Disabled',
   endpoint: '',
   username: '',
   password: '',
-  bucket: '',
-  region: '',
-  password: '',
-  endpoint: '',
   bucket: '',
   region: '',
   accessKeyId: '',
@@ -537,27 +537,51 @@ onMounted(async () => {
   await loadGames()
   await loadCloudSettings()
   
-  listen('galgame-auto-backup', (event) => {
+  const unlistenAutoBackup = await listen('galgame-auto-backup', (event) => {
     ElMessage.success(event.payload)
   })
+  unlistenFns.push(unlistenAutoBackup)
   
-  listen('galgame-auto-backup-error', (event) => {
+  const unlistenAutoBackupError = await listen('galgame-auto-backup-error', (event) => {
     ElMessage.error(event.payload)
   })
+  unlistenFns.push(unlistenAutoBackupError)
 
-  listen('galgame-playtime-update', (event) => {
+  const unlistenPlaytimeUpdate = await listen('galgame-playtime-update', (event) => {
     const updatedGame = event.payload
     const idx = games.value.findIndex(g => g.name === updatedGame.name)
     if (idx !== -1) {
       games.value[idx] = updatedGame
     }
   })
+  unlistenFns.push(unlistenPlaytimeUpdate)
+})
+
+onUnmounted(() => {
+  while (unlistenFns.length > 0) {
+    const unlisten = unlistenFns.pop()
+    if (typeof unlisten === 'function') {
+      unlisten()
+    }
+  }
 })
 
 async function loadGames() {
   try {
     const result = await invoke('galgame_list_games')
     games.value = result
+
+    if (selectedGame.value) {
+      const refreshed = result.find(g => g.name === selectedGame.value.name)
+      if (refreshed) {
+        selectedGame.value = refreshed
+      } else {
+        selectedGame.value = null
+        showSnapshots.value = false
+        snapshots.value = []
+      }
+    }
+
     // Load covers for all games
     result.forEach(game => loadCover(game))
   } catch (e) {
@@ -738,6 +762,11 @@ async function openBackupFolder() {
 }
 
 async function launchGame(game) {
+  if (!canLaunch(game)) {
+    ElMessage.warning('该游戏未配置启动路径')
+    return
+  }
+
   try {
     await invoke('galgame_launch_game', { gameName: game.name })
     ElMessage.success('正在启动游戏...')
@@ -779,7 +808,33 @@ async function scanSavePaths() {
   }
 }
 
+function canLaunch(game) {
+  return typeof game?.exe_path === 'string' && game.exe_path.trim().length > 0
+}
+
+function normalizePathType(value) {
+  return String(value).toLowerCase() === 'file' ? 'File' : 'Folder'
+}
+
+function openAddGameDialog() {
+  editingGame.value = null
+  editingOriginalName.value = null
+  newGame.value = createEmptyGameForm()
+  showAddGameDialog.value = true
+}
+
+function closeAddGameDialog() {
+  showAddGameDialog.value = false
+}
+
+function handleGameDialogClosed() {
+  editingGame.value = null
+  editingOriginalName.value = null
+  newGame.value = createEmptyGameForm()
+}
+
 async function quickAddFromScan(candidate) {
+  openAddGameDialog()
   newGame.value.name = candidate.game_name
   newGame.value.savePath = candidate.path
   newGame.value.pathType = 'Folder'
@@ -796,8 +851,9 @@ async function browseSavePath() {
       multiple: false,
       title: isFolder ? '选择存档目录' : '选择存档文件'
     })
-    if (selected) {
-      newGame.value.savePath = selected
+    const selectedPath = Array.isArray(selected) ? selected[0] : selected
+    if (selectedPath) {
+      newGame.value.savePath = selectedPath
     }
   } catch (e) {
     console.error('浏览失败:', e)
@@ -811,8 +867,9 @@ async function browseExePath() {
       filters: [{ name: '可执行文件', extensions: ['exe', 'lnk', 'bat', 'cmd'] }],
       title: '选择启动文件'
     })
-    if (selected) {
-      newGame.value.exePath = selected
+    const selectedPath = Array.isArray(selected) ? selected[0] : selected
+    if (selectedPath) {
+      newGame.value.exePath = selectedPath
     }
   } catch (e) {
     console.error('选择启动文件失败:', e)
@@ -825,8 +882,9 @@ async function browseCoverImage() {
       filters: [{ name: '图片', extensions: ['png', 'jpg', 'jpeg', 'webp'] }],
       title: '选择游戏封面'
     })
-    if (selected) {
-      newGame.value.coverImage = selected
+    const selectedPath = Array.isArray(selected) ? selected[0] : selected
+    if (selectedPath) {
+      newGame.value.coverImage = selectedPath
     }
   } catch (e) {
     console.error('选择封面失败:', e)
@@ -835,43 +893,51 @@ async function browseCoverImage() {
 
 function editGame(game) {
   editingGame.value = game
+  editingOriginalName.value = game.name
   newGame.value = {
     name: game.name,
     savePath: game.save_paths?.[0]?.paths?.default || '',
-    pathType: game.save_paths?.[0]?.unit_type || 'folder',
+    pathType: normalizePathType(game.save_paths?.[0]?.unit_type),
     backupMode: game.backup_mode || 'manual',
     backupInterval: game.auto_backup_interval || 60,
     exePath: game.exe_path || '',
-    coverImage: game.cover_image || ''
+    coverImage: game.cover_image || '',
   }
   showAddGameDialog.value = true
 }
 
 async function addGame() {
-  if (!newGame.value.name || !newGame.value.savePath) {
+  const name = (newGame.value.name || '').trim()
+  const savePath = (newGame.value.savePath || '').trim()
+
+  if (!name || !savePath) {
     ElMessage.warning('请填写游戏名称和存档路径')
     return
   }
 
   try {
     const game = {
-      name: newGame.value.name,
+      name,
       save_paths: [{
         unit_type: newGame.value.pathType.toLowerCase(),
-        paths: { default: newGame.value.savePath },
-        delete_before_apply: false
+        paths: { default: savePath },
+        delete_before_apply: false,
       }],
       game_paths: {},
-      exe_path: newGame.value.exePath || null,
+      exe_path: (newGame.value.exePath || '').trim() || null,
       backup_mode: newGame.value.backupMode,
       auto_backup_interval: newGame.value.backupInterval,
-      cover_image: newGame.value.coverImage || null
+      cover_image: (newGame.value.coverImage || '').trim() || null,
     }
-    await invoke('galgame_add_game', { game, update: !!editingGame.value })
+
+    await invoke('galgame_add_game', {
+      game,
+      update: !!editingGame.value,
+      oldName: editingOriginalName.value,
+    })
+
     ElMessage.success(editingGame.value ? '游戏已更新' : '游戏添加成功')
-    showAddGameDialog.value = false
-    editingGame.value = null
-    newGame.value = { name: '', savePath: '', pathType: 'Folder', backupMode: 'manual', backupInterval: 60, exePath: '', coverImage: '' }
+    closeAddGameDialog()
     await loadGames()
   } catch (e) {
     ElMessage.error('操作失败: ' + e)

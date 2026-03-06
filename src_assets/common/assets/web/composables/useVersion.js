@@ -3,7 +3,7 @@ import { marked } from 'marked'
 import SunshineVersion from '../sunshine_version.js'
 import { trackEvents } from '../config/firebase.js'
 
-const GITHUB_API_BASE = 'https://api.github.com/repos/qiin2333/Sunshine/releases'
+const GITHUB_API_BASE = 'https://api.github.com/repos/LizardByte/Sunshine/releases'
 
 /**
  * 解析 Markdown 内容

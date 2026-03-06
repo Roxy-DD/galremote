@@ -2,7 +2,7 @@
   <nav class="navbar navbar-light navbar-expand-lg navbar-background header">
     <div class="container-fluid">
       <a class="navbar-brand brand-enhanced" href="/" title="Sunshine">
-        <img src="/images/logo-sunshine-256.png" height="50" alt="Sunshine-Foundation" class="brand-logo" />
+        <img src="/images/logo-sunshine-256.png" height="50" alt="GalRemote" class="brand-logo" />
       </a>
       <button
         class="navbar-toggler"

@@ -5,7 +5,6 @@ use crate::windows;
 use crate::tray;
 use crate::sunshine;
 use crate::proxy_server;
-use crate::update;
 
 /// 应用程序状态
 pub struct AppState {
@@ -32,7 +31,7 @@ pub fn setup_application(app: &mut App) -> Result<(), Box<dyn std::error::Error>
     setup_menu_event_handler(app);
     start_proxy_server_async();
     
-    // 延迟任务：工具栏和更新检查
+    // 延迟任务：工具栏
     tauri::async_runtime::spawn(async move {
         if show_toolbar && !show_desktop {
             info!("🔧 检测到 --toolbar 参数，将在应用启动后打开工具栏");
@@ -40,11 +39,6 @@ pub fn setup_application(app: &mut App) -> Result<(), Box<dyn std::error::Error>
             if let Err(e) = toolbar::create_toolbar_window_internal(&app_handle) {
                 error!("❌ 创建工具栏失败: {}", e);
             }
-        }
-        
-        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
-        if let Err(e) = update::init_update_checker(&app_handle) {
-            error!("❌ 初始化更新检查器失败: {}", e);
         }
     });
     

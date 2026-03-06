@@ -208,36 +208,6 @@ export function useTools() {
   }
 
   /**
-   * 检查更新
-   */
-  const checkForUpdates = async () => {
-    try {
-      const { invoke } = await import('@tauri-apps/api/core')
-
-      ElMessage.info('正在检查更新...')
-
-      const result = await invoke('check_for_updates')
-
-      if (result) {
-        return result // 返回更新信息，让调用者处理
-      } else {
-        ElMessage.success('已是最新版本')
-        return null
-      }
-    } catch (error) {
-      if (error.includes('已是最新版本')) {
-        ElMessage.success('已是最新版本')
-      } else {
-        console.error('检查更新失败:', error)
-        ElMessage.error('检查更新失败: ' + error)
-      }
-      return null
-    }
-  }
-
-
-
-  /**
    * 打开剪贴板同步工具（系统弹窗风格）
    */
   const openClipboardSync = async () => {
@@ -356,7 +326,6 @@ export function useTools() {
     openUrl,
     cleanupCovers,
     restartAsAdmin,
-    checkForUpdates,
     createWindow,
   }
 }

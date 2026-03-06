@@ -21,10 +21,6 @@ namespace system_tray_i18n {
   const std::string KEY_CHINESE = "chinese";
   const std::string KEY_ENGLISH = "english";
   const std::string KEY_JAPANESE = "japanese";
-  const std::string KEY_STAR_PROJECT = "star_project";
-  const std::string KEY_HELP_US = "help_us";
-  const std::string KEY_DEVELOPER_YUNDI339 = "developer_yundi339";
-  const std::string KEY_DEVELOPER_QIIN = "developer_qiin";
   const std::string KEY_RESET_DISPLAY_DEVICE_CONFIG = "reset_display_device_config";
   const std::string KEY_RESTART = "restart";
   const std::string KEY_QUIT = "quit";
@@ -80,10 +76,6 @@ namespace system_tray_i18n {
     { KEY_CHINESE, "中文" },
     { KEY_ENGLISH, "English" },
     { KEY_JAPANESE, "日本語" },
-    { KEY_STAR_PROJECT, "Star Project" },
-    { KEY_HELP_US, "Sponsor Us" },
-    { KEY_DEVELOPER_YUNDI339, "Developer: Yundi339" },
-    { KEY_DEVELOPER_QIIN, "Developer: Qiin" },
     { KEY_RESET_DISPLAY_DEVICE_CONFIG, "Reset Display Memory" },
     { KEY_RESTART, "Restart" },
     { KEY_QUIT, "Quit" },
@@ -136,10 +128,6 @@ namespace system_tray_i18n {
     { KEY_CHINESE, "中文" },
     { KEY_ENGLISH, "English" },
     { KEY_JAPANESE, "日本語" },
-    { KEY_STAR_PROJECT, "Star项目" },
-    { KEY_HELP_US, "赞助我们" },
-    { KEY_DEVELOPER_YUNDI339, "开发者：Yundi339" },
-    { KEY_DEVELOPER_QIIN, "开发者：Qiin" },
     { KEY_RESET_DISPLAY_DEVICE_CONFIG, "重置显示器记忆" },
     { KEY_RESTART, "重新启动" },
     { KEY_QUIT, "退出" },
@@ -191,10 +179,6 @@ namespace system_tray_i18n {
     { KEY_CHINESE, "中文" },
     { KEY_ENGLISH, "English" },
     { KEY_JAPANESE, "日本語" },
-    { KEY_STAR_PROJECT, "スターを付ける" },
-    { KEY_HELP_US, "スポンサー" },
-    { KEY_DEVELOPER_YUNDI339, "開発者：Yundi339" },
-    { KEY_DEVELOPER_QIIN, "開発者：Qiin" },
     { KEY_RESET_DISPLAY_DEVICE_CONFIG, "ディスプレイメモリをリセット" },
     { KEY_RESTART, "再起動" },
     { KEY_QUIT, "終了" },

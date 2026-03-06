@@ -27,21 +27,6 @@
       <!-- 错误日志 -->
       <ErrorLogs :fatal-logs="fatalLogs" />
 
-      <!-- 版本信息 -->
-      <VersionCard
-        :version="version"
-        :github-version="githubVersion"
-        :pre-release-version="preReleaseVersion"
-        :notify-pre-releases="notifyPreReleases"
-        :loading="loading"
-        :installed-version-not-stable="installedVersionNotStable"
-        :stable-build-available="stableBuildAvailable"
-        :pre-release-build-available="preReleaseBuildAvailable"
-        :build-version-is-dirty="buildVersionIsDirty"
-        :parsed-stable-body="parsedStableBody"
-        :parsed-pre-release-body="parsedPreReleaseBody"
-      />
-
     </div>
   </div>
 </template>
@@ -52,27 +37,9 @@ import Navbar from '../components/layout/Navbar.vue'
 import SetupWizard from '../components/SetupWizard.vue'
 import ResourceCard from '../components/common/ResourceCard.vue'
 import ErrorLogs from '../components/common/ErrorLogs.vue'
-import VersionCard from '../components/common/VersionCard.vue'
-import { useVersion } from '../composables/useVersion.js'
 import { useLogs } from '../composables/useLogs.js'
 import { useSetupWizard } from '../composables/useSetupWizard.js'
 import { trackEvents } from '../config/firebase.js'
-
-// 使用组合式函数
-const {
-  version,
-  githubVersion,
-  preReleaseVersion,
-  notifyPreReleases,
-  loading,
-  installedVersionNotStable,
-  stableBuildAvailable,
-  preReleaseBuildAvailable,
-  buildVersionIsDirty,
-  parsedStableBody,
-  parsedPreReleaseBody,
-  fetchVersions,
-} = useVersion()
 
 const { fatalLogs, fetchLogs } = useLogs()
 
@@ -115,16 +82,8 @@ onMounted(async () => {
       return
     }
 
-    // 获取版本信息
-    await fetchVersions(config)
-
     // 获取日志
     await fetchLogs()
-
-    // 更新页面标题
-    if (version.value) {
-      document.title += ` Ver ${version.value.version}`
-    }
   } catch (e) {
     // 在预览模式下，API 不可用是正常的，只记录警告
     if (e?.message?.includes('JSON') || e?.message?.includes('<!DOCTYPE')) {

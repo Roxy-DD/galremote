@@ -59,7 +59,7 @@
             <div class="col-md-6 col-lg-4">
               <a
                 class="resource-link resource-link-android"
-                href="https://github.com/qiin2333/moonlight-android/releases/tag/shortcut"
+                href="https://github.com/moonlight-stream/moonlight-android"
                 target="_blank"
               >
                 <div class="resource-icon">
@@ -107,7 +107,7 @@
             <div class="col-md-6 col-lg-4">
               <a
                 class="resource-link resource-link-desktop"
-                href="https://github.com/qiin2333/moonlight-qt"
+                href="https://github.com/moonlight-stream/moonlight-qt"
                 target="_blank"
               >
                 <div class="resource-icon">

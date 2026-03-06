@@ -132,20 +132,6 @@ pub fn save_config(config: &GalgameConfig) -> ConfigResult<()> {
     Ok(())
 }
 
-/// 添加游戏
-pub fn add_game(config: &mut GalgameConfig, game: Game) -> ConfigResult<()> {
-    // 检查是否已存在
-    if config.games.iter().any(|g| g.name == game.name) {
-        // 更新已有游戏
-        if let Some(existing) = config.games.iter_mut().find(|g| g.name == game.name) {
-            *existing = game;
-        }
-    } else {
-        config.games.push(game);
-    }
-    save_config(config)
-}
-
 /// 删除游戏
 pub fn remove_game(config: &mut GalgameConfig, game_name: &str) -> ConfigResult<bool> {
     let len_before = config.games.len();

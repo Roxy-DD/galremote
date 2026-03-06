@@ -309,7 +309,7 @@ export default {
       saveError: null,
       saving: false,
       // 客户端下载链接
-      androidQrCode: 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=' + encodeURIComponent('https://github.com/qiin2333/moonlight-android/releases/tag/shortcut'),
+      androidQrCode: 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=' + encodeURIComponent('https://github.com/moonlight-stream/moonlight-android'),
       iosQrCode: 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=' + encodeURIComponent('https://apps.apple.com/us/app/voidlink/id6747717070'),
     }
   },

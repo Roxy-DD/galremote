@@ -10,6 +10,21 @@ use super::scanner::{SavePathScanner, SaveCandidate};
 
 type CmdResult<T> = Result<T, String>;
 
+fn normalize_game_name(name: &str) -> String {
+    name.split_whitespace()
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_lowercase()
+}
+
+fn find_game_index_by_name(games: &[Game], name: &str) -> Option<usize> {
+    let normalized_target = normalize_game_name(name);
+    games
+        .iter()
+        .position(|g| normalize_game_name(&g.name) == normalized_target)
+}
+
 #[command]
 pub fn galgame_get_config() -> CmdResult<GalgameConfig> {
     load_config().map_err(|e| format!("Failed to load config: {}", e))
@@ -21,12 +36,12 @@ pub fn galgame_save_config(config: GalgameConfig) -> CmdResult<()> {
 }
 
 #[command]
-pub fn galgame_add_game(mut game: Game, update: bool) -> CmdResult<()> {
+pub fn galgame_add_game(mut game: Game, update: bool, old_name: Option<String>) -> CmdResult<()> {
     let mut cfg = load_config().map_err(|e| format!("Failed to load config: {}", e))?;
-    
-    // Check for duplicate game name only if NOT updating
-    if !update && cfg.games.iter().any(|g| g.name == game.name) {
-        return Err(format!("已存在同名游戏: {}", game.name));
+
+    game.name = game.name.trim().to_string();
+    if game.name.is_empty() {
+        return Err("游戏名称不能为空".to_string());
     }
 
     // Handle cover image auto-backup
@@ -57,7 +72,31 @@ pub fn galgame_add_game(mut game: Game, update: bool) -> CmdResult<()> {
         }
     }
 
-    config::add_game(&mut cfg, game).map_err(|e| format!("Failed to add game: {}", e))
+    let target_index = if update {
+        let old_name_trimmed = old_name
+            .as_deref()
+            .map(str::trim)
+            .filter(|name| !name.is_empty());
+        old_name_trimmed
+            .and_then(|name| find_game_index_by_name(&cfg.games, name))
+            .or_else(|| find_game_index_by_name(&cfg.games, &game.name))
+    } else {
+        None
+    };
+
+    if let Some(existing_index) = find_game_index_by_name(&cfg.games, &game.name) {
+        if Some(existing_index) != target_index {
+            return Err(format!("已存在同名游戏: {}", game.name));
+        }
+    }
+
+    if let Some(index) = target_index {
+        cfg.games[index] = game;
+    } else {
+        cfg.games.push(game);
+    }
+
+    save_config(&cfg).map_err(|e| format!("Failed to save config: {}", e))
 }
 
 #[command]
@@ -341,7 +380,8 @@ async fn sync_config_from_cloud(local_cfg: &mut GalgameConfig) -> CmdResult<bool
     // Merge Logic
     let mut modified = false;
     for cloud_game in cloud_cfg.games {
-        if let Some(local_game) = local_cfg.games.iter_mut().find(|g| g.name == cloud_game.name) {
+        if let Some(local_index) = find_game_index_by_name(&local_cfg.games, &cloud_game.name) {
+            let local_game = &mut local_cfg.games[local_index];
             // Intelligent Play Time Merge
             // Calculate legacy time (time recorded before history tracking)
             let local_history_sum: u64 = local_game.play_history.iter().map(|s| s.duration_seconds).sum();
@@ -351,14 +391,25 @@ async fn sync_config_from_cloud(local_cfg: &mut GalgameConfig) -> CmdResult<bool
             let cloud_legacy = cloud_game.total_play_time.saturating_sub(cloud_history_sum);
             let max_legacy = local_legacy.max(cloud_legacy);
 
-            // Merge Play History (Union)
-            let existing_keys: std::collections::HashSet<_> = local_game.play_history.iter()
-                .map(|p| (p.start_time, p.device_id.clone())).collect();
-            
+            // Merge Play History (Union + duration reconciliation)
+            let mut existing_keys: std::collections::HashMap<_, usize> = local_game
+                .play_history
+                .iter()
+                .enumerate()
+                .map(|(idx, p)| ((p.start_time, p.device_id.clone()), idx))
+                .collect();
+
             let mut history_changed = false;
-            for session in cloud_game.play_history {
-                if !existing_keys.contains(&(session.start_time, session.device_id.clone())) {
-                    local_game.play_history.push(session);
+            for session in &cloud_game.play_history {
+                let key = (session.start_time, session.device_id.clone());
+                if let Some(existing_idx) = existing_keys.get(&key).copied() {
+                    if session.duration_seconds > local_game.play_history[existing_idx].duration_seconds {
+                        local_game.play_history[existing_idx].duration_seconds = session.duration_seconds;
+                        history_changed = true;
+                    }
+                } else {
+                    existing_keys.insert(key, local_game.play_history.len());
+                    local_game.play_history.push(session.clone());
                     history_changed = true;
                 }
             }
@@ -397,31 +448,28 @@ async fn sync_config_from_cloud(local_cfg: &mut GalgameConfig) -> CmdResult<bool
 
             // Merge Metadata if missing locally
             if local_game.description.is_none() && cloud_game.description.is_some() {
-                local_game.description = cloud_game.description;
+                local_game.description = cloud_game.description.clone();
                 modified = true;
             }
             if local_game.developer.is_none() && cloud_game.developer.is_some() {
-                local_game.developer = cloud_game.developer;
+                local_game.developer = cloud_game.developer.clone();
                 modified = true;
             }
             if local_game.release_date.is_none() && cloud_game.release_date.is_some() {
-                local_game.release_date = cloud_game.release_date;
+                local_game.release_date = cloud_game.release_date.clone();
                 modified = true;
             }
             
             // Merge Status
-            // Logic: Upgrade status (NotStarted -> Playing -> Finished)
-            // Or prefer Cloud if local is NotStarted.
-            if local_game.status == GameStatus::NotStarted && cloud_game.status != GameStatus::NotStarted {
-                 local_game.status = cloud_game.status;
-                 modified = true;
-            } else if cloud_game.status == GameStatus::Finished && local_game.status != GameStatus::Finished {
-                 local_game.status = GameStatus::Finished;
-                 modified = true;
-            } else if cloud_game.status == GameStatus::Shelved && local_game.status != GameStatus::Shelved {
-                 // Maybe shelved? Valid state change.
-                 // Let's assume cloud is 'newer' roughly? No timestamp.
-                 // Conservative merge: only upgrade to Finished or take from NotStarted.
+            let merged_status = merge_game_status(
+                &local_game.status,
+                &cloud_game.status,
+                local_game.last_played,
+                cloud_game.last_played,
+            );
+            if merged_status != local_game.status {
+                local_game.status = merged_status;
+                modified = true;
             }
             
         } else {
@@ -437,6 +485,43 @@ async fn sync_config_from_cloud(local_cfg: &mut GalgameConfig) -> CmdResult<bool
     }
     
     Ok(modified)
+}
+
+fn merge_game_status(
+    local_status: &GameStatus,
+    cloud_status: &GameStatus,
+    local_last_played: Option<i64>,
+    cloud_last_played: Option<i64>,
+) -> GameStatus {
+    use GameStatus::*;
+
+    if local_status == cloud_status {
+        return local_status.clone();
+    }
+
+    if *local_status == Finished || *cloud_status == Finished {
+        return Finished;
+    }
+
+    if *local_status == NotStarted {
+        return cloud_status.clone();
+    }
+
+    if *cloud_status == NotStarted {
+        return local_status.clone();
+    }
+
+    match (local_status, cloud_status) {
+        (Playing, Shelved) | (Shelved, Playing) => {
+            match (local_last_played, cloud_last_played) {
+                (Some(local_time), Some(cloud_time)) if cloud_time > local_time => cloud_status.clone(),
+                (Some(_), Some(_)) => local_status.clone(),
+                (None, Some(_)) => cloud_status.clone(),
+                _ => local_status.clone(),
+            }
+        }
+        _ => local_status.clone(),
+    }
 }
 
 #[command]

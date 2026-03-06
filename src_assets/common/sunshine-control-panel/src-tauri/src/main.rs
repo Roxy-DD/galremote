@@ -11,7 +11,6 @@ mod sunshine;
 mod system;
 mod toolbar;
 mod tray;
-mod update;
 mod utils;
 mod vdd;
 mod windows;
@@ -92,9 +91,6 @@ fn main() {
             fs_utils::cleanup_unused_covers,
             fs_utils::resolve_lnk_target,
             fs_utils::scan_directory_for_apps,
-            update::check_for_updates,
-            update::download_update,
-            update::install_update,
             logger::get_all_logs,
             logger::clear_logs,
             logger::export_logs,

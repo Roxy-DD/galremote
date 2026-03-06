@@ -433,7 +433,7 @@
     "webhook_timeout_desc": "Timeout for webhook requests in milliseconds, range 100-5000ms"
   },
   "index": {
-    "description": "Sunshine Foundation - The elegant game streaming solution for the community",
+    "description": "GalRemote - Independent game streaming and management toolkit",
     "download": "Download",
     "installed_version_not_stable": "You are running a pre-release version of Sunshine. You may experience bugs or other issues. Please report any issues you encounter. Thank you for helping to make Sunshine a better software!",
     "loading_latest": "Loading latest release...",
@@ -442,10 +442,10 @@
     "startup_errors": "<b>Attention!</b> Sunshine detected these errors during startup. We <b>STRONGLY RECOMMEND</b> fixing them before streaming.",
     "version_dirty": "Thank you for helping to make Sunshine a better software!",
     "version_latest": "You are running the latest version of Sunshine",
-    "welcome": "Hello, Sunshine-Foundation!"
+    "welcome": "Hello, GalRemote!"
   },
   "setup": {
-    "welcome": "Welcome to Sunshine Foundation",
+    "welcome": "Welcome to GalRemote",
     "description": "Let's get you started with a quick setup",
     "step0_title": "Language",
     "step0_description": "Choose your interface language",
@@ -590,7 +590,7 @@
     "confirm_password": "Confirm password",
     "create_creds": "Before Getting Started, we need you to make a new username and password for accessing the Web UI.",
     "create_creds_alert": "The credentials below are needed to access Sunshine's Web UI. Keep them safe, since you will never see them again!",
-    "greeting": "Welcome to Sunshine Foundation!",
+    "greeting": "Welcome to GalRemote!",
     "login": "Login",
     "welcome_success": "This page will reload soon, your browser will ask you for the new credentials",
     "username": "Username",

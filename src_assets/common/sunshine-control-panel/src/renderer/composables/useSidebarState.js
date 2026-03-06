@@ -1,9 +1,6 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
 
-// 忽略版本的 localStorage 键名
-const SKIPPED_VERSION_KEY = 'sunshine-skipped-version'
-
 /**
  * 侧边栏状态管理 Composable
  */
@@ -14,14 +11,7 @@ export function useSidebarState() {
   const isMaximized = ref(false)
   const isAdmin = ref(true)
   const showVddSettings = ref(false)
-  const showUpdateDialog = ref(false)
-  const updateInfo = ref(null)
-  const currentVersion = ref('0.0.0')
-  const skippedVersion = ref(localStorage.getItem(SKIPPED_VERSION_KEY) || '')
 
-  // 存储需要清理的监听器
-  let unlistenUpdateAvailable = null
-  let unlistenUpdateCheckResult = null
   let messageEventListener = null
 
   /**
@@ -70,28 +60,6 @@ export function useSidebarState() {
    */
   const openVddSettings = () => {
     showVddSettings.value = true
-  }
-
-  /**
-   * 忽略指定版本的更新
-   */
-  const skipVersion = (version) => {
-    if (version) {
-      // 规范化版本号（移除 v/V 前缀）
-      const normalizedVersion = version.replace(/^[vV]/, '')
-      skippedVersion.value = normalizedVersion
-      localStorage.setItem(SKIPPED_VERSION_KEY, normalizedVersion)
-      ElMessage.info(`已忽略版本 ${version}，下次自动检查更新时将跳过此版本`)
-    }
-  }
-
-  /**
-   * 检查版本是否被忽略
-   */
-  const isVersionSkipped = (version) => {
-    if (!version || !skippedVersion.value) return false
-    const normalizedVersion = version.replace(/^[vV]/, '')
-    return normalizedVersion === skippedVersion.value
   }
 
   /**
@@ -160,42 +128,6 @@ export function useSidebarState() {
       }
     }
     window.addEventListener('message', messageEventListener)
-
-    // 获取当前 Sunshine 版本
-    try {
-      const { invoke } = await import('@tauri-apps/api/core')
-      const sunshineVersion = await invoke('get_sunshine_version')
-      currentVersion.value = sunshineVersion || 'Unknown'
-    } catch (error) {
-      console.error('获取 Sunshine 版本失败:', error)
-      currentVersion.value = 'Unknown'
-    }
-
-    // 监听自动更新检查事件
-    const { listen } = await import('@tauri-apps/api/event')
-    unlistenUpdateAvailable = await listen('update-available', (event) => {
-      console.log('收到更新可用事件:', event.payload)
-      const newVersion = event.payload?.version
-
-      // 检查是否是被忽略的版本
-      if (isVersionSkipped(newVersion)) {
-        console.log(`版本 ${newVersion} 已被忽略，跳过更新提示`)
-        return
-      }
-
-      updateInfo.value = event.payload
-      showUpdateDialog.value = true
-    })
-
-    // 监听更新检查结果事件（来自托盘菜单）
-    unlistenUpdateCheckResult = await listen('update-check-result', (event) => {
-      const data = event.payload
-      if (data.is_latest) {
-        ElMessage.success(data.message || '已是最新版本')
-      } else if (data.error) {
-        ElMessage.error('检查更新失败: ' + data.error)
-      }
-    })
   }
 
   // 初始化
@@ -211,16 +143,6 @@ export function useSidebarState() {
       messageEventListener = null
     }
 
-    // 清理 Tauri 事件监听器
-    if (unlistenUpdateAvailable) {
-      unlistenUpdateAvailable()
-      unlistenUpdateAvailable = null
-    }
-
-    if (unlistenUpdateCheckResult) {
-      unlistenUpdateCheckResult()
-      unlistenUpdateCheckResult = null
-    }
   })
 
   return {
@@ -230,16 +152,10 @@ export function useSidebarState() {
     isMaximized,
     isAdmin,
     showVddSettings,
-    showUpdateDialog,
-    updateInfo,
-    currentVersion,
-    skippedVersion,
 
     // 方法
     toggleTheme,
     toggleCollapse,
     openVddSettings,
-    skipVersion,
-    isVersionSkipped,
   }
 }
