@@ -1,114 +1,190 @@
 # 第四章 系统架构与详细设计
 
-在本章中，我们将详细阐述 GalRemote 系统的整体架构与各个核心功能模块的内部设计。本系统采用了**“C++ 底层引擎驱动 + Rust 中台层管理 + Vue3 现代化前端呈现”**的三层分离架构。通过对串流控制、Galgame 原生库管理、云存档同步以及本地持久化等模块的设计分析，展示系统如何解决跨端串流与状态同步的技术难题。
+基于第三章中提出的各项功能需求（跨端串流接管、Galgame 原生库管理、云存档并集同步等）与非功能需求（超低串流延迟、轻量化资源占用），本章将详细阐述 GalRemote 系统的整体架构与各个核心功能模块的内部设计。为满足上述严苛要求，本系统采用了**“C++ 底层引擎驱动 + Rust 中台层管理 + Vue3 现代化前端呈现”**的三层分离架构，从而有效解决跨端串流与状态同步的技术难题。
 
 ## 4.1 系统整体架构设计
 
-为保证串流的超低延迟以及 GUI 面板的高度可扩展性，本系统摒弃了传统的单一单体架构或纯 Web 架构，转而采用了基于 **Tauri** 跨平台框架配合本地代理协议的混合型物理与逻辑架构。
+为保证串流的超低延迟并跨越不同操作系统的底层 API 壁垒，同时考虑到 GUI 面板的高度可扩展性，本系统摒弃了传统的单一单体架构，转而采用了基于 **Tauri** 跨平台框架配合本地代理协议的混合型物理与逻辑架构。
 
 ### 4.1.1 物理与逻辑架构模型
 
-系统整体划分为 **三大核心层（Three-Tier Architecture）**：
+系统整体划分为 **三大核心层（Three-Tier Architecture）**，如下图所示：
+
+```mermaid
+graph TB
+    subgraph Presentation Layer [展现层: Vue 3 + Desktop UI]
+        UI_Dash(仪表盘)
+        UI_Gal(Galgame管理器)
+        UI_VDD(虚拟显示器设置)
+        UI_Sync(云同步工具)
+    end
+
+    subgraph Middleware Layer [中台层: Tauri Rust Backend]
+        Axum(Axum 跨域代理服务)
+        SysMgr(进程与托盘接管)
+        VNDB_Scraper(VNDB API 刮削器)
+        Cloud_Sync(OpenDAL 多后端同步)
+        VDD_Mgr(VDD 注册表驱动)
+        File_IO(异步文件系统)
+    end
+
+    subgraph Core Engine Layer [核心层: C++ Streaming Engine]
+        Video_Encode(DXGI/Wayland 捕获与硬件编码)
+        Input_Inject(ViGEm 虚拟手柄/触控注入)
+        RTSP_Server(RTSP/Moonlight 协议栈)
+        Audio_Catch(WASAPI 音频捕获)
+    end
+
+    UI_Dash -->|HTTP REST| Axum
+    UI_Gal -->|Tauri IPC| VNDB_Scraper
+    UI_Gal -->|Tauri IPC| File_IO
+    UI_VDD -->|Tauri IPC| VDD_Mgr
+    UI_Sync -->|Tauri IPC| Cloud_Sync
+
+    Axum -.->|配置分发| RTSP_Server
+    SysMgr ==>|伴随启动/心跳监控| Core Engine Layer
+    VDD_Mgr -.->|改变物理环境| Video_Encode
+```
 
 1. **C++ 串流底层引擎（Streaming Core Engine Layer）**
-   - **定位**：系统的大脑神经与骨骼，继承深广的 Sunshine/Moonlight 协议生态。
-   - **职责**：直接同操作系统 API 交互，负责桌面画面捕获（如 Windows DXGI）、音频捕获（WASAPI）、硬件视频编码（NVIDIA NVENC / AMD AMF），以及高频的外设输入（鼠标、键盘、虚拟手柄）信号注入。
-   - **通信机制**：作为后台静默守护进程运行，对外暴露安全的 RESTful API 与 RTSP 视频流传输通道。
+   - **定位**：系统的大脑神经与骨骼，承担第三章中提出的“10ms 级低延迟串流”性能需求。
+   - **职责**：直接同操作系统 API 交互，负责桌面画面捕获（如 Windows DXGI）、音频捕获（WASAPI）、硬件视频编码（NVIDIA NVENC / AMD AMF），以及高频的外设输入信号注入。
 
 2. **Rust 面板中台层（Tauri Backend / Middleware Layer）**
-   - **定位**：连接底层服务与顶层 UI 的中枢，本系统最核心的管理业务逻辑落脚点。
+   - **定位**：连接底层服务与顶层 UI 的中枢，承接“跨平台管理”与“结构化扫描”的核心业务。
    - **职责**：
-     - **进程监管**：动态启停 C++ 引擎，接管系统托盘（System Tray）生命周期。
-     - **虚拟硬件管理（VDD Model）**：直接操作 Windows 注册表与系统设备树，动态挂载/卸载无头虚拟显示器（Virtual Display Dummy），以匹配移动端屏幕的自定义分辨率与刷新率。
-     - **业务核心**：提供 Galgame 硬盘目录的并发扫描、VNDB (Visual Novel Database) 原生 API 刮削，以及实现 WebDAV/S3 等多协议云存档同步逻辑。
-   - **通信机制**：内置 Axum 代理服务器跨过浏览器 CORS 限制，同时向前端提供高效的 Tauri IPC (Inter-Process Communication) 命令映射。
+     - **虚拟硬件管理（VDD Model）**：直接操作操作系统设备树，挂载虚拟显示器以匹配移动端分辨率。
+     - **业务核心**：提供 Galgame 硬盘目录的并发扫描、VNDB (Visual Novel Database) 原生 API 刮削，以及实现跨协议云存档同步逻辑。
 
 3. **Vue 3 现代化前端层（Presentation Layer）**
-   - **定位**：直接面向用户的原生级桌面控制面板（Sunshine Control Panel）。
-   - **职责**：通过自研的 Desktop UI 框架，提供窗口管理、游戏卡片瀑布流展示、存档历史快照浏览器等高频交互界面。所有视音频配置、键位映射亦在此完成展现。
-
-**【图 4-1 GalRemote 系统三层物理与逻辑架构图 (请在这里插入架构图)】**
+   - **职责**：通过自研的 Desktop UI 框架，在不妥协性能的前提下提供贴近原生应用的交互体验，包括窗口管理、瀑布流展示与存档时间机器等界面。
 
 ---
 
 ## 4.2 串流控制模块设计
 
-串流控制模块是使用户能够在移动端流畅接管宿主机资源的桥梁，核心在于“无感介入”与“资源动态匹配”。
+为满足第三章 3.2 节中“移动端全功能指控”的需求，串流控制模块的设计重点在于“无感介入”与“资源动态匹配”。
 
-### 4.2.1 引擎进程管控设计
-面板应用（Tauri）通过系统进程调用机制，以伴随模式启动 C++ 引擎进程。设计中引入了一套 **心跳监控与自动拉起（Watchdog）机制**。当检测到网络波动导致引擎 Panic 或者内存溢出时，Rust 后端可在 500ms 内收集崩溃日志并重新拉起 `sunshine.exe`，保证串流服务的可用性。
+### 4.2.1 引擎进程管控与心跳设计
+由于 C++ 底层可能因显卡驱动等外部因素崩溃，面板应用（Tauri）采用伴随模式管理引擎。当检测到 `sunshine.exe` 退出码异常时，Rust 后端可在 500ms 内收集崩溃日志（通过重定向 Stdout）并重新拉起服务，对外表现为“无缝自愈”。
 
 ### 4.2.2 虚拟操作接管 (Virtual Input Inject)
-为支持手机端复杂的触屏映射，模块设计支持基于 ViGEmBus 的虚拟手柄接入。
-- 在握手阶段，C++ 引擎解析客户端传来的键位布局；
-- 串流进行时，将收到的触控/陀螺仪数据解包为标准 Xbox360/DualShock4 电信号态，通过 `InjectSyntheticPointerInput` 等 Windows API 直接在底层（Ring 0）级别注入操作系统。
+
+```mermaid
+sequenceDiagram
+    participant Mobile as 手机端 (Moonlight)
+    participant Cpp as C++ 串流引擎
+    participant WinAPI as Windows 底层 API (Ring 0)
+    
+    Mobile->>Cpp: 建立握手 (报告触摸/手柄 Layout)
+    loop 每秒 100 帧+
+        Mobile->>Cpp: 发送触控/陀螺仪数据流
+        Cpp->>Cpp: 解包为坐标与按键电平 (x, y, Button)
+        alt 纯触控模式
+            Cpp->>WinAPI: InjectSyntheticPointerInput (绝对坐标注入)
+        else 虚拟手柄模式
+            Cpp->>WinAPI: ViGEmBus 接口注入 (Xbox360/DS4 态)
+        end
+    end
+```
 
 ### 4.2.3 虚拟显示器（VDD）自适应动态模型设计
-传统串流常遭遇“带鱼屏推流到手机产生黑边”的问题。本模块通过 VDD (Virtual Display Device) 驱动实现：
-1. **连接初探**：客户端报告屏幕比例（如 21:9，3200x1440@120Hz）。
-2. **虚拟挂载**：Rust VDD 模块通过命令行/API 即时向系统注册一块该规格的虚拟显示器。
-3. **主屏欺骗**：将该虚拟屏幕设为主屏，物理显示器息屏，实现像素级完美匹配。串流断开时则反向恢复。
+传统串流常遭遇“带鱼屏推流到手机产生黑边”的问题。本模块通过 VDD (Virtual Display Device) 驱动实现：客户端握手时报告屏幕比例（如 21:9），Rust 中台层即刻通过命令行调用注入注册表，凭空生成一块该分辨率的虚拟显示器并设为主屏。断开时，自动剥离该显示器，恢复宿主机原有生态。
 
 ---
 
 ## 4.3 Galgame 库管理与刮削模块设计
 
-针对传统文件夹散乱堆放的痛点，该模块将非结构化的游戏目录抽象转换为高度结构化的数字资产。
+针对第三章分析的“海量未结构化游戏目录管理困难”，该模块使用并发算法将其转换为结构化资产。
 
-### 4.3.1 本地目录扫描算法流
-1. 用户指定若干根目录（如 `D:\Games\Galgames`）。
-2. 使用 Rust 的高性能并发异步 I/O (基于 `tokio` 或跨线程池) 扫描目录树。
-3. **特征识别**：引擎寻找特征文件，如包含 `.exe` 启动文件，或包含 `data.xp3` (Kirikiri引擎)、`Rio.arc`等常见 Galgame 引擎数据包。一旦匹配，即在内存中生成基础 Game 实体对象。
+### 4.3.1 跨端数据刮削流程 (Scraper Workflow)
 
-### 4.3.2 VNDB 交互与数据刮削流程
-为了补全游戏的文字信息与封面，设计了自动刮削流：
-1. **模糊匹配请求**：后端提取目录名过滤掉多余版本号字符，利用 HTTP 客户端向 VNDB GraphQL API 发起 Query 检索。
-2. **相关度排序**：根据返回的发行商(Developer)、发售日期与匹配精确度进行置信度(Confidence)评分，选取最高者。
-3. **资源下载与本地化**：异步下载封面图片 (Cover)、截图 (Screenshots) 至本地缓存目录，并将描述、评分等提取存入配置文件，从而在前端渲染出精美的瀑布流卡片。
+使用 Rust `tokio` 异步运行时结合 VNDB 的 GraphQL API进行处理，其时序如下：
 
-**【图 4-2 本地文件扫描与 VNDB 刮削交互时序图 (请在这里插入时序图)】**
+```mermaid
+sequenceDiagram
+    participant User
+    participant Rust as Tauri Rust (Scraper)
+    participant FS as 本地文件系统
+    participant VNDB as VNDB (GraphQL API)
+    
+    User->>Rust: 点击“扫描指定库”
+    Rust->>FS: 异步遍历目录树 (寻找 .exe/data.xp3)
+    FS-->>Rust: 返回原始游戏列表 (如 "clannad_cn_v1.0")
+    
+    loop 针对每个未识别游戏
+        Rust->>Rust: 正则清洗目录名 -> 提取关键词 "clannad"
+        Rust->>VNDB: 发起 GraphQL 模糊检索
+        VNDB-->>Rust: 返回候选列表 (包含置信度/发售日/开发商)
+        Rust->>Rust: NLP 余弦相似度计算，提取最佳匹配
+        Rust->>VNDB: 下载 Cover & Screenshots (异步并发)
+    end
+    
+    Rust->>FS: 持久化 JSON 数据字典并落盘图片
+    Rust-->>User: 刷新瀑布流界面
+```
 
 ---
 
 ## 4.4 智能云存档同步模块设计
 
-Galgame 的存档极其琐碎且不可还原，本模块为解决“家里推了一半，出门想用手机接着推”的多端痛点，设计了镜像级双向同步系统。
+为实现第三章 3.3 节强调的“任何地点、任何设备无缝接力”，本模块设计了无后端的双向并行同步机制。
 
-### 4.4.1 多后端抽象层与 OpenDAL 接入
-存储后端不可枚举，系统采用统一对象存储接口抽象（如接入 Apache OpenDAL），从而能够无缝对接 WebDAV (如坚果云)、S3 兼容 API (如阿里云 OSS / NAS 自建 MinIO) 等多种协议。协议层被封装在 `cloud.rs` 中。
+### 4.4.1 镜像合并算法与多端冲突解决矩阵
+由于 Galgame 包含全局系统记录文件（SystemData）与槽位快照文件（SlotData），简单的全量覆盖必然导致丢档。系统采用 **基于元数据快照的并集冲突解决算法**：
 
-### 4.4.2 镜像合并算法与冲突解决 (Intelligent Merge)
-由于存档目录下的文件更新频繁且带有时间戳，本模块抛弃了简单的文件覆盖，采用 **基于元数据快照的并集算法**：
-1. **基准快照 (Baseline Snapshot)**：记录上一次成功同步时，本地各存档文件的 `(FileHash, ModifiedTime)`。
-2. **差异比对 (Diffing)**：串流断开后，扫描本地目录，计算增、删、改列表。
-3. **冲突解决矩阵**：
-   - 场景 A：云端无变化，本地有新存档 → **上传 (Push)**
-   - 场景 B：云端有新游玩记录文件（来自其他设备），本地无变化 → **拉取 (Pull)**
-   - 场景 C（冲突）：云端和本地均各自产生了新存档 → **拆分聚合模型**：如果是不同的 `.sav` 存档槽文件，则执行并集下载；如果是同名的系统通用设置文件，则采用 `Last-Writer-Wins` (时间戳最新者优先) 覆盖，并保留旧文件备份。
-
-### 4.4.3 存档守护者（版本回溯系统）
-为避免误覆盖导致“坏档”，每次发生云同步替换前，系统会将当前本地存档目录整体压缩（Zlib/ZIP 算法）打包至本地 `snapshots/` 隐藏目录下，命名为带有时间戳的不可变版本。前端提供可视化的“时间机器”界面，允许用户一键回滚到任意时刻的状态。
+```mermaid
+stateDiagram-v2
+    [*] --> 串流结束断开
+    串流结束断开 --> 本地差异比对
+    本地差异比对 --> 场景判断
+    
+    state 场景判断 {
+        场景A(本地新存档_云端无修改) --> 执行直传Push
+        场景B(云端有其他设备记录_本地无修改) --> 执行拉取Pull
+        场景C(两端同时产生新记录_严重冲突) --> 拆分聚合模型
+    }
+    
+    拆分聚合模型 --> Slot文件: 执行并集 (双向保留)
+    拆分聚合模型 --> System文件: Last-Writer-Wins (时间戳最新覆写，且保留旧文件 .bak)
+    
+    执行直传Push --> 生成时间戳快照并压缩入隐藏目录
+    执行拉取Pull --> 刷新前端本地状态
+```
 
 ---
 
-## 4.5 数据库与本地持久化存储设计
+## 4.5 本地持久化存储设计与 ER 模型
 
-出于绿色化、去中心化（无后端数据库服务器）以及极速读取的需求，系统未引入 MySQL 一类重型关系型数据库，而是基于轻量级实体映射与文件持久化。
+出于低耗和免安装的需求（非功能性指标），系统摒弃了庞大的关系型数据库驻留，全部采用基于 `Serde` 的强类型 JSON 文件序列化，其核心实体关系 (ER) 结构如下：
 
-### 4.5.1 实体关系模型设计 (ER 模型)
-系统主要围绕 **Game (游戏本体)**、**SaveData (存档状态)** 与 **Metadata (元信息)** 展开。
+```mermaid
+erDiagram
+    GAME {
+        string ID PK "UUID或VNDB_ID"
+        string Title "游戏名"
+        string ExecutablePath "启动程序绝对路径"
+        string CoverUrl "本地缓存封面路径"
+    }
+    PLAY_STATS {
+        string GameID FK
+        int TotalPlayTime "累计游玩秒数"
+        int LastPlayedTime "最后游玩Unix时间戳"
+    }
+    CLOUD_BACKEND {
+        string ID PK
+        string Type "WebDAV/S3"
+        string Endpoint "服务端点"
+    }
+    SNAPSHOT {
+        string ID PK "时间印记"
+        string GameID FK
+        string ArchivePath "zip包物理路径"
+    }
 
-- **Game Entity**: [ID (UUID/VNDB_ID), Title, OriginalName, ExtractedPath, ExecutablePath, Publisher, ReleaseDate]
-- **Stats Entity**: [GameID, TotalPlayTime (秒), LastPlayedTime (Unix秒)]
-- **CloudBackend Entity**: [ID, Type (S3/WebDAV), Endpoint, Credentials, BucketName]
-- **Snapshot Entity**: [ID, GameID, Timestamp, FileArchiveSize, Description]
+    GAME ||--o{ PLAY_STATS : "拥有"
+    GAME ||--o{ SNAPSHOT : "产生历史备份"
+    CLOUD_BACKEND ||--o{ GAME : "承载同步(策略映射)"
+```
 
-**【图 4-3 GalRemote 系统核心实体关系图 (ER 图) (请在这里插入ER图)】**
-
-### 4.5.2 本地 JSON 状态字典
-这些实体被序列化后，分布在项目的独立 `config/` 目录中：
-1. **`galgames.json`**：采用键值对(`std::collections::HashMap`在 Rust 侧持久化) 记录所有游戏的基础信息（刮削结果与本地路径关联）。
-2. **`play_stats.json`**：独立分离的数据字典。由于该文件经常发生写操作（游戏心跳监控每隔一段时间更新总游玩时长），因此与不变的 `galgames.json` 拆分，避免 I/O 锁争用并防止元数据损坏。
-3. **`sync_history.json`**：类似 Git 的 Commit Log，记录着本地到云端的同步游标和历史。
-
-这类设计利用了 Rust `Serde` 宏生态的强类型反序列化检查框架，在保证轻量化的同时完全摒弃了数据污染抛出 Panic 的隐患，显著提升了系统的鲁棒性。
+为避免高频的心跳统计写坏静态的游戏元数据，系统将 `GAME` 的静态描述与 `PLAY_STATS` 的动态追踪分成了两个独立的 JSON 字典（`galgames.config.json` 与 `play_stats.json`），在应用层通过内存引用的方式实现联表逻辑，保证了原子性与高吞吐。
