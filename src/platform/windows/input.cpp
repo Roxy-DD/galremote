@@ -21,7 +21,10 @@
 #include "src/platform/common.h"
 
 #ifdef __MINGW32__
-#ifndef HSYNTHETICPOINTERDEVICE
+#include <_mingw.h>
+#if defined(__MINGW64_VERSION_MAJOR)
+// For modern MinGW (where it's defined already), skip DECLARE_HANDLE
+#elif !defined(HSYNTHETICPOINTERDEVICE)
 DECLARE_HANDLE(HSYNTHETICPOINTERDEVICE);
 #endif
 WINUSERAPI HSYNTHETICPOINTERDEVICE WINAPI
