@@ -12,27 +12,27 @@
 
 ```mermaid
 graph TB
-    subgraph PresentationLayer [展现层: Vue 3 + Desktop UI]
-        UI_Dash("仪表盘")
-        UI_Gal("Galgame管理器")
-        UI_VDD("虚拟显示器设置")
-        UI_Sync("云同步工具")
+    subgraph PresentationLayer [展现层]
+        UI_Dash[仪表盘]
+        UI_Gal[Galgame管理器]
+        UI_VDD[虚拟显示器设置]
+        UI_Sync[云同步工具]
     end
 
-    subgraph MiddlewareLayer [中台层: Tauri Rust Backend]
-        Axum("Axum 跨域代理服务")
-        SysMgr("进程与托盘接管")
-        VNDB_Scraper("VNDB API 刮削器")
-        Cloud_Sync("OpenDAL 多后端同步")
-        VDD_Mgr("VDD 注册表驱动")
-        File_IO("异步文件系统")
+    subgraph MiddlewareLayer [中台层]
+        Axum[Axum 跨域代理服务]
+        SysMgr[进程与托盘接管]
+        VNDB_Scraper[VNDB API 刮削器]
+        Cloud_Sync[OpenDAL 多后端同步]
+        VDD_Mgr[VDD 注册表驱动]
+        File_IO[异步文件系统]
     end
 
-    subgraph CoreEngineLayer [核心层: C++ Streaming Engine]
-        Video_Encode("DXGI/Wayland 捕获与硬件编码")
-        Input_Inject("ViGEm 虚拟手柄/触控注入")
-        RTSP_Server("RTSP/Moonlight 协议栈")
-        Audio_Catch("WASAPI 音频捕获")
+    subgraph CoreEngineLayer [核心层]
+        Video_Encode[DXGI或Wayland捕获与硬件编码]
+        Input_Inject[ViGEm虚拟手柄或触控注入]
+        RTSP_Server[RTSP或Moonlight协议栈]
+        Audio_Catch[WASAPI音频捕获]
     end
 
     UI_Dash -->|HTTP REST| Axum
@@ -42,7 +42,7 @@ graph TB
     UI_Sync -->|Tauri IPC| Cloud_Sync
 
     Axum -.->|配置分发| RTSP_Server
-    SysMgr ==>|伴随启动/心跳监控| CoreEngineLayer
+    SysMgr ==>|伴随启动或心跳监控| CoreEngineLayer
     VDD_Mgr -.->|改变物理环境| Video_Encode
 ```
 
@@ -140,9 +140,9 @@ stateDiagram-v2
     本地差异比对 --> 场景判断
     
     state 场景判断 {
-        state "本地新存档_云端无修改" as SceneA
-        state "云端有其他设备记录_本地无修改" as SceneB
-        state "两端同时产生新记录_严重冲突" as SceneC
+        SceneA: 本地新存档_云端无修改
+        SceneB: 云端有其他设备记录_本地无修改
+        SceneC: 两端同时产生新记录_严重冲突
         
         SceneA --> 执行直传Push
         SceneB --> 执行拉取Pull
@@ -165,30 +165,30 @@ stateDiagram-v2
 ```mermaid
 erDiagram
     GAME {
-        string ID PK "UUID或VNDB_ID"
-        string Title "游戏名"
-        string ExecutablePath "启动程序绝对路径"
-        string CoverUrl "本地缓存封面路径"
+        string ID_PK
+        string Title
+        string ExecutablePath
+        string CoverUrl
     }
     PLAY_STATS {
-        string GameID FK
-        int TotalPlayTime "累计游玩秒数"
-        int LastPlayedTime "最后游玩Unix时间戳"
+        string GameID_FK
+        int TotalPlayTime
+        int LastPlayedTime
     }
     CLOUD_BACKEND {
-        string ID PK
-        string Type "WebDAV/S3"
-        string Endpoint "服务端点"
+        string ID_PK
+        string Type
+        string Endpoint
     }
     SNAPSHOT {
-        string ID PK "时间印记"
-        string GameID FK
-        string ArchivePath "zip包物理路径"
+        string ID_PK
+        string GameID_FK
+        string ArchivePath
     }
 
-    GAME ||--o{ PLAY_STATS : "拥有"
-    GAME ||--o{ SNAPSHOT : "产生历史备份"
-    CLOUD_BACKEND ||--o{ GAME : "承载同步(策略映射)"
+    GAME ||--o{ PLAY_STATS : has
+    GAME ||--o{ SNAPSHOT : generates
+    CLOUD_BACKEND ||--o{ GAME : syncs
 ```
 
 为避免高频的心跳统计写坏静态的游戏元数据，系统将 `GAME` 的静态描述与 `PLAY_STATS` 的动态追踪分成了两个独立的 JSON 字典（`galgames.config.json` 与 `play_stats.json`），在应用层通过内存引用的方式实现联表逻辑，保证了原子性与高吞吐。
