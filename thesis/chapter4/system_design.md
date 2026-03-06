@@ -11,28 +11,34 @@
 系统整体划分为 **三大核心层（Three-Tier Architecture）**，如下图所示：
 
 ```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'arial', 'primaryColor': '#F8FAFC', 'primaryBorderColor': '#CBD5E1', 'lineColor': '#64748B'}}}%%
 graph TB
-    subgraph PresentationLayer [展现层: Vue 3 + Desktop UI]
-        UI_Dash("仪表盘")
-        UI_Gal("Galgame管理器")
-        UI_VDD("虚拟显示器设置")
-        UI_Sync("云同步工具")
+    classDef layer fill:#ffffff,stroke:#CBD5E1,stroke-width:2px,stroke-dasharray: 4 4;
+    classDef vue fill:#ECFDF5,stroke:#10B981,stroke-width:1.5px,color:#064E3B;
+    classDef rust fill:#FEF2F2,stroke:#EF4444,stroke-width:1.5px,color:#7F1D1D;
+    classDef cpp fill:#EFF6FF,stroke:#3B82F6,stroke-width:1.5px,color:#1E3A8A;
+    
+    subgraph PresentationLayer [Presentation Layer: Vue 3 Desktop UI]
+        UI_Dash("Dash Monitor"):::vue
+        UI_Gal("Galgame Organizer"):::vue
+        UI_VDD("Display Settings"):::vue
+        UI_Sync("Sync Dashboard"):::vue
     end
 
-    subgraph MiddlewareLayer [中台层: Tauri Rust Backend]
-        Axum("Axum 跨域代理服务")
-        SysMgr("进程与托盘接管")
-        VNDB_Scraper("VNDB API 刮削器")
-        Cloud_Sync("OpenDAL 多后端同步")
-        VDD_Mgr("VDD 注册表驱动")
-        File_IO("异步文件系统")
+    subgraph MiddlewareLayer [Middleware Layer: Tauri Rust Backend]
+        Axum("Axum CORS Proxy"):::rust
+        SysMgr("Daemon Watchdog"):::rust
+        VNDB_Scraper("VNDB API Client"):::rust
+        Cloud_Sync("OpenDAL Sync Engine"):::rust
+        VDD_Mgr("VDD Registry Driver"):::rust
+        File_IO("Async FS Pipeline"):::rust
     end
 
-    subgraph CoreEngineLayer [核心层: C++ Streaming Engine]
-        Video_Encode("DXGI/Wayland 捕获与硬件编码")
-        Input_Inject("ViGEm 虚拟手柄/触控注入")
-        RTSP_Server("RTSP/Moonlight 协议栈")
-        Audio_Catch("WASAPI 音频捕获")
+    subgraph CoreEngineLayer [Core Engine Layer: C++ Streaming Engine]
+        Video_Encode("DXGI/NVENC Hardware Encoder"):::cpp
+        Input_Inject("ViGEm Input Injector"):::cpp
+        RTSP_Server("RTSP/Moonlight Protocol Stack"):::cpp
+        Audio_Catch("WASAPI Audio Catcher"):::cpp
     end
 
     UI_Dash -->|HTTP REST| Axum
@@ -41,9 +47,11 @@ graph TB
     UI_VDD -->|Tauri IPC| VDD_Mgr
     UI_Sync -->|Tauri IPC| Cloud_Sync
 
-    Axum -.->|配置分发| RTSP_Server
-    SysMgr ==>|伴随启动/心跳监控| CoreEngineLayer
-    VDD_Mgr -.->|改变物理环境| Video_Encode
+    Axum -.->|Config Dispatch| RTSP_Server
+    SysMgr ==>|Heartbeat Monitor| CoreEngineLayer
+    VDD_Mgr -.->|Physical Morph| Video_Encode
+
+    class PresentationLayer,MiddlewareLayer,CoreEngineLayer layer;
 ```
 
 1. **C++ 串流底层引擎（Streaming Core Engine Layer）**
@@ -70,19 +78,20 @@ graph TB
 - **虚拟操作接管**：客户端握手时报告布局，系统通过解包坐标流，动态调用 `InjectSyntheticPointerInput` 或 `ViGEmBus` 对系统执行指令注入。
 
 ```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'actorBkg': '#F1F5F9', 'actorBorder': '#64748B', 'actorLineColor': '#94A3B8', 'signalColor': '#334155', 'signalTextColor': '#1E293B', 'fontFamily': 'arial'}}}%%
 sequenceDiagram
-    participant Client as 移动端 (Moonlight/Web端等)
-    participant Cpp as C++ 串流引擎
-    participant WinAPI as Windows 底层 API (Ring 0)
+    participant Client as Client (Mobile/Web)
+    participant Cpp as C++ Stream Engine
+    participant WinAPI as Win32 API (Ring 0)
     
-    Client->>Cpp: 建立握手 (报告触摸/手柄 Layout)
-    loop 每秒 100 帧+
-        Client->>Cpp: 发送触控/陀螺仪数据流
-        Cpp->>Cpp: 解包为坐标与按键电平 (x, y, Button)
-        alt 纯触控模式
-            Cpp->>WinAPI: InjectSyntheticPointerInput (绝对坐标注入)
-        else 虚拟手柄模式
-            Cpp->>WinAPI: ViGEmBus 接口注入 (Xbox360/DS4 态)
+    Client->>Cpp: Handshake (Report Layout)
+    loop 100+ FPS Stream
+        Client->>Cpp: Send Touch/Gyro Data
+        Cpp->>Cpp: Unpack (x, y, Button)
+        alt Pure Touch Mode
+            Cpp->>WinAPI: InjectSyntheticPointerInput (Absolute X/Y)
+        else Virtual Gamepad Mode
+            Cpp->>WinAPI: ViGEmBus Injection (Xbox360/DS4 State)
         end
     end
 ```
@@ -92,26 +101,27 @@ sequenceDiagram
 针对“海量未结构化游戏目录管理困难”，该模块使用并发算法将其转换为结构化资产。使用 Rust 异步运行时结合 VNDB 的 GraphQL API进行处理，其时序如下：
 
 ```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'actorBkg': '#F1F5F9', 'actorBorder': '#64748B', 'actorLineColor': '#94A3B8', 'signalColor': '#334155', 'signalTextColor': '#1E293B', 'fontFamily': 'arial'}}}%%
 sequenceDiagram
     participant User
     participant Rust as Tauri Rust (Scraper)
-    participant FS as 本地文件系统
+    participant FS as Local File System
     participant VNDB as VNDB (GraphQL API)
     
-    User->>Rust: 点击“扫描指定库”
-    Rust->>FS: 异步遍历目录树 (寻找 .exe/data.xp3)
-    FS-->>Rust: 返回原始游戏列表
+    User->>Rust: Start Library Scan
+    Rust->>FS: Async Tree Traversal (.exe/.xp3)
+    FS-->>Rust: Return Raw List
     
-    loop 针对每个未识别游戏
-        Rust->>Rust: 正则清洗目录名
-        Rust->>VNDB: 发起 GraphQL 模糊检索
-        VNDB-->>Rust: 返回候选列表
-        Rust->>Rust: NLP 余弦相似度计算，提取最佳匹配
-        Rust->>VNDB: 下载封面与截图 (异步并发)
+    loop For each unknown title
+        Rust->>Rust: Regex Normalize Path Name
+        Rust->>VNDB: GraphQL Fuzzy Rank Search
+        VNDB-->>Rust: Return Candidate List
+        Rust->>Rust: Cosine Similarity Match (NLP)
+        Rust->>VNDB: Async Download Cover & Screen
     end
     
-    Rust->>FS: 持久化 JSON 数据字典并落盘图片
-    Rust-->>User: 刷新瀑布流界面
+    Rust->>FS: Persist JSON DB & Flush Images
+    Rust-->>User: Trigger UI Refresh
 ```
 
 ### 4.2.3 智能云存档同步模块
@@ -119,26 +129,27 @@ sequenceDiagram
 为实现“任何地点、任何设备无缝接力”，由于 Galgame 包含全局系统记录文件（SystemData）与槽位快照文件（SlotData），简单的全量覆盖必然导致丢档。系统采用 **基于元数据快照的并集冲突解决算法**：
 
 ```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'arial', 'primaryColor': '#F1F5F9', 'primaryBorderColor': '#94A3B8', 'labelBoxBkgColor': '#E2E8F0'}}}%%
 stateDiagram-v2
-    [*] --> 串流断开
-    串流断开 --> 差异扫描算法
-    差异扫描算法 --> 并集决策矩阵
+    [*] --> Stream_Disconnected
+    Stream_Disconnected --> Diff_Scanner
+    Diff_Scanner --> Union_Decision_Matrix
     
-    state 并集决策矩阵 {
-        state "A. 本地产生新存档\n云端无更新" as SceneA
-        state "B. 其它设备产生云记录\n本地静默无更新" as SceneB
-        state "C. 强冲突\n两端各自产生独立记录" as SceneC
+    state Union_Decision_Matrix {
+        state "A. Local New / Cloud Null" as SceneA
+        state "B. Cloud New / Local Null" as SceneB
+        state "C. Hard Conflict (Both Mutated)" as SceneC
         
-        SceneA --> 执行上传_Push
-        SceneB --> 执行拉取_Pull
-        SceneC --> 双向差分策略
+        SceneA --> Exec_Push
+        SceneB --> Exec_Pull
+        SceneC --> Bi_Diff_Strategy
     }
     
-    双向差分策略 --> Slot插槽档: 增量拉取/上传 (双向保留)
-    双向差分策略 --> Sys全局档: LWW策略 (基于时间戳覆写)
+    Bi_Diff_Strategy --> Slot_Data: Incremental Sync (Keep Both)
+    Bi_Diff_Strategy --> Sys_Data: LWW Strategy (Timestamp Override)
     
-    执行上传_Push --> Zlib压缩时间快照备份
-    执行拉取_Pull --> 更新并释放句柄
+    Exec_Push --> Zlib_Archive_Snapshot
+    Exec_Pull --> Flush_Handle_Yield
 ```
 
 ---
@@ -150,35 +161,36 @@ stateDiagram-v2
 为保证在前端状态树与后端 Rust 结构体、物理文件之间的数据一致性，系统规划了以下非关系型（NoSQL）文档的**核心实体关系 (Entity-Relationship) 模型**：
 
 ```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'fontFamily': 'arial', 'primaryColor': '#F1F5F9', 'primaryBorderColor': '#94A3B8'}}}%%
 erDiagram
     GAME {
-        string ID PK "游戏唯一标识符(UUID/VNDB_ID)"
-        string Title "游戏展示头衔"
-        string ExecutablePath "提取或挂载镜像后的启动路由"
-        string CoverUrl "异步下载封面的本地缓存路径"
-        boolean SyncEnabled "是否激活该记录的云端同步"
+        string ID PK "UUID / VNDB_ID"
+        string Title "Display Name"
+        string ExecutablePath "Launch Routing Path"
+        string CoverUrl "Local Cover Cache Path"
+        boolean SyncEnabled "Is Cloud Sync Active"
     }
     PLAY_STATS {
-        string GameID FK "外键绑定游戏实体"
-        int TotalPlayTime "累计挂机/游玩秒数"
-        int LastPlayedTime "最后活跃周期(Unix时间戳)"
+        string GameID FK "Linked Game Entity"
+        int TotalPlayTime "Cumulative Seconds"
+        int LastPlayedTime "Unix Epoch Timestamp"
     }
     CLOUD_BACKEND {
-        string ID PK "云存储商UUID"
-        string Type "WebDAV/S3/MinIO/Local"
-        string Endpoint "网络挂载点或鉴权路由"
-        string AuthToken "加密存储的流传输令牌"
+        string ID PK "Provider UUID"
+        string Type "WebDAV / S3 / Local"
+        string Endpoint "Mount URL"
+        string AuthToken "Encrypted Token"
     }
     SNAPSHOT_LOG {
-        string HashID PK "版本散列哈希(SHA-256)"
-        string GameID FK "从属游戏"
-        string ArchivePath "被Zlib化之后存储的物理备份路径"
-        string SyncStrategy "LWW覆写或双向保留标记"
+        string HashID PK "SHA-256 Checksum"
+        string GameID FK "Linked Game"
+        string ArchivePath "Zlib Compressed Bin Path"
+        string SyncStrategy "LWW or Keep-Both Tag"
     }
 
-    GAME ||--o{ PLAY_STATS : "高频监控挂载"
-    GAME ||--o{ SNAPSHOT_LOG : "历史防丢档快照"
-    CLOUD_BACKEND ||--o{ GAME : "承载跨端游戏状态字典与槽位"
+    GAME ||--o{ PLAY_STATS : "High-Freq Mount"
+    GAME ||--o{ SNAPSHOT_LOG : "History Safenet"
+    CLOUD_BACKEND ||--o{ GAME : "Cross-Device Sync"
 ```
 
 ### 4.3.1 领域驱动设计下的冷热分离策略
