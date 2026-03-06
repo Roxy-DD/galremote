@@ -12,27 +12,27 @@
 
 ```mermaid
 graph TB
-    subgraph Presentation Layer [展现层: Vue 3 + Desktop UI]
-        UI_Dash(仪表盘)
-        UI_Gal(Galgame管理器)
-        UI_VDD(虚拟显示器设置)
-        UI_Sync(云同步工具)
+    subgraph PresentationLayer [展现层: Vue 3 + Desktop UI]
+        UI_Dash("仪表盘")
+        UI_Gal("Galgame管理器")
+        UI_VDD("虚拟显示器设置")
+        UI_Sync("云同步工具")
     end
 
-    subgraph Middleware Layer [中台层: Tauri Rust Backend]
-        Axum(Axum 跨域代理服务)
-        SysMgr(进程与托盘接管)
-        VNDB_Scraper(VNDB API 刮削器)
-        Cloud_Sync(OpenDAL 多后端同步)
-        VDD_Mgr(VDD 注册表驱动)
-        File_IO(异步文件系统)
+    subgraph MiddlewareLayer [中台层: Tauri Rust Backend]
+        Axum("Axum 跨域代理服务")
+        SysMgr("进程与托盘接管")
+        VNDB_Scraper("VNDB API 刮削器")
+        Cloud_Sync("OpenDAL 多后端同步")
+        VDD_Mgr("VDD 注册表驱动")
+        File_IO("异步文件系统")
     end
 
-    subgraph Core Engine Layer [核心层: C++ Streaming Engine]
-        Video_Encode(DXGI/Wayland 捕获与硬件编码)
-        Input_Inject(ViGEm 虚拟手柄/触控注入)
-        RTSP_Server(RTSP/Moonlight 协议栈)
-        Audio_Catch(WASAPI 音频捕获)
+    subgraph CoreEngineLayer [核心层: C++ Streaming Engine]
+        Video_Encode("DXGI/Wayland 捕获与硬件编码")
+        Input_Inject("ViGEm 虚拟手柄/触控注入")
+        RTSP_Server("RTSP/Moonlight 协议栈")
+        Audio_Catch("WASAPI 音频捕获")
     end
 
     UI_Dash -->|HTTP REST| Axum
@@ -42,7 +42,7 @@ graph TB
     UI_Sync -->|Tauri IPC| Cloud_Sync
 
     Axum -.->|配置分发| RTSP_Server
-    SysMgr ==>|伴随启动/心跳监控| Core Engine Layer
+    SysMgr ==>|伴随启动/心跳监控| CoreEngineLayer
     VDD_Mgr -.->|改变物理环境| Video_Encode
 ```
 
@@ -140,13 +140,17 @@ stateDiagram-v2
     本地差异比对 --> 场景判断
     
     state 场景判断 {
-        场景A(本地新存档_云端无修改) --> 执行直传Push
-        场景B(云端有其他设备记录_本地无修改) --> 执行拉取Pull
-        场景C(两端同时产生新记录_严重冲突) --> 拆分聚合模型
+        state "本地新存档_云端无修改" as SceneA
+        state "云端有其他设备记录_本地无修改" as SceneB
+        state "两端同时产生新记录_严重冲突" as SceneC
+        
+        SceneA --> 执行直传Push
+        SceneB --> 执行拉取Pull
+        SceneC --> 拆分聚合模型
     }
     
-    拆分聚合模型 --> Slot文件: 执行并集 (双向保留)
-    拆分聚合模型 --> System文件: Last-Writer-Wins (时间戳最新覆写，且保留旧文件 .bak)
+    拆分聚合模型 --> Slot文件_执行并集保留
+    拆分聚合模型 --> System文件_时间戳最新覆写备份
     
     执行直传Push --> 生成时间戳快照并压缩入隐藏目录
     执行拉取Pull --> 刷新前端本地状态
