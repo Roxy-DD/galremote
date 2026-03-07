@@ -6,6 +6,7 @@ mod commands;
 mod fs_utils;
 mod galgame;
 mod logger;
+mod network;
 mod proxy_server;
 mod sunshine;
 mod system;
@@ -117,6 +118,9 @@ fn main() {
             galgame::commands::galgame_launch_game,
             galgame::commands::galgame_search_metadata,
             galgame::commands::galgame_apply_metadata,
+            galgame::commands::galgame_github_oauth_request,
+            galgame::commands::galgame_github_oauth_poll,
+            galgame::commands::galgame_github_setup_repo,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -284,24 +284,64 @@ pub fn restore_snapshot(
                 log_content.push_str("  Action: Restoring...\n");
 
                 // 1. 清理
-                if force_delete_before || save_unit.delete_before_apply {
-                    log_content.push_str("  Cleaning existing files...\n");
-                    if target_path.exists() {
+                // 1. 备份与清理
+                if target_path.exists() {
+                    let bak_root = super::config::get_config_path()
+                        .parent()
+                        .unwrap_or(Path::new("."))
+                        .join(".bak_saves");
+
+                    let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S").to_string();
+                    let safe_name: String = game
+                        .name
+                        .chars()
+                        .map(|c| if c.is_alphanumeric() { c } else { '_' })
+                        .collect();
+                    let unit_hash = format!(
+                        "{:x}",
+                        md5::compute(target_path.to_string_lossy().as_bytes())
+                    );
+                    let backup_dir =
+                        bak_root.join(format!("{}_{}_{}", safe_name, unit_hash, timestamp));
+
+                    log::info!(
+                        "Creating safety backup of local saves before restore: {:?}",
+                        backup_dir
+                    );
+                    if let Err(e) = std::fs::create_dir_all(&backup_dir) {
+                        log::error!("Failed to create backup dir: {}", e);
+                    } else {
+                        // Copy existing local files to .bak_saves
+                        let options = fs_extra::dir::CopyOptions::new().content_only(true);
+                        if target_path.is_dir() {
+                            if let Err(e) = fs_extra::dir::copy(&target_path, &backup_dir, &options)
+                            {
+                                log::error!("Failed to backup local dir: {}", e);
+                            }
+                        } else if target_path.is_file() {
+                            if let Some(file_name) = target_path.file_name() {
+                                let _ = std::fs::copy(&target_path, backup_dir.join(file_name));
+                            }
+                        }
+                    }
+
+                    if force_delete_before || save_unit.delete_before_apply {
+                        log_content.push_str("  Cleaning existing files...\n");
                         log::info!("Deleting existing path: {:?}", target_path);
                         if target_path.is_file() {
-                            if let Err(e) = fs::remove_file(&target_path) {
+                            if let Err(e) = std::fs::remove_file(&target_path) {
                                 log_content
                                     .push_str(&format!("  [ERROR] Failed to delete file: {}\n", e));
                             }
                         } else if target_path.is_dir() {
-                            if let Err(e) = fs::remove_dir_all(&target_path) {
+                            if let Err(e) = std::fs::remove_dir_all(&target_path) {
                                 log_content
                                     .push_str(&format!("  [ERROR] Failed to delete dir: {}\n", e));
                             }
                         }
-                    } else {
-                        log_content.push_str("  Target does not exist (clean).\n");
                     }
+                } else {
+                    log_content.push_str("  Target does not exist (clean).\n");
                 }
 
                 // 2. 覆盖/解压

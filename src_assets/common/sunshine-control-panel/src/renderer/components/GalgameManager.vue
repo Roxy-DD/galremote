@@ -1,7 +1,7 @@
 <template>
   <div class="galgame-manager">
     <!-- 标题栏 -->
-    <div class="galgame-header">
+    <div class="galgame-header" v-if="!showSnapshots">
       <h2>🎮 游戏存档管理</h2>
       <div class="header-actions">
         <el-button type="primary" @click="scanSavePaths" :loading="scanning">
@@ -28,7 +28,7 @@
     </div>
 
     <!-- 游戏列表 -->
-    <el-scrollbar class="games-container">
+    <el-scrollbar class="games-container" v-if="!showSnapshots">
       <div v-if="games.length === 0" class="empty-state">
         <el-icon :size="80" class="empty-icon"><FolderOpened /></el-icon>
         <h3>尚未添加任何游戏</h3>
@@ -95,97 +95,22 @@
       </div>
     </el-scrollbar>
 
-    <!-- 快照面板 -->
-    <el-drawer
-      v-model="showSnapshots"
-      :title="selectedGame?.name + ' - 存档快照'"
-      direction="rtl"
-      size="420px"
-    >
-      <div v-if="selectedGame" class="drawer-game-overview">
-        <div class="overview-content">
-          <div class="overview-cover">
-            <el-image :src="getCoverUrl(selectedGame)" fit="cover" style="width: 100%; height: 100%">
-               <template #error>
-                 <div class="image-slot"><el-icon><Picture /></el-icon></div>
-               </template>
-            </el-image>
-          </div>
-          <div class="overview-details">
-             <div class="overview-tags">
-               <el-tag size="small" type="info" v-if="selectedGame.developer">{{ selectedGame.developer }}</el-tag>
-               <el-tag size="small" type="info" v-if="selectedGame.release_date">{{ selectedGame.release_date }}</el-tag>
-             </div>
-             <div class="overview-playtime" v-if="selectedGame.total_play_time > 0">
-                <el-icon><VideoPlay /></el-icon> 
-                <span>已游玩 {{ formatPlayTime(selectedGame.total_play_time) }}</span>
-             </div>
-             <div class="overview-desc" v-if="selectedGame.description" :title="selectedGame.description">
-               {{ selectedGame.description }}
-             </div>
-          </div>
-        </div>
-        <el-divider style="margin: 16px 0" />
-      </div>
-      <div class="snapshots-header">
-        <el-button type="primary" @click="createSnapshot(selectedGame)">
-          <el-icon><Plus /></el-icon>
-          创建新快照
-        </el-button>
-        <el-button @click="openBackupFolder">
-          <el-icon><FolderOpened /></el-icon>
-          目录
-        </el-button>
-        <el-button type="warning" @click="openScraper(selectedGame)">
-          <el-icon><MagicStick /></el-icon>
-          元数据
-        </el-button>
-        <el-button v-if="cloudEnabled" type="danger" plain @click="deleteCloudBackups">
-          <el-icon><Delete /></el-icon>
-          清空云端
-        </el-button>
-        <el-dropdown trigger="click" @command="handleStatusChange">
-           <el-button class="status-btn" :type="getGameStatusType(selectedGame.status)" plain>
-             {{ getGameStatusLabel(selectedGame.status) }}<el-icon class="el-icon--right"><ArrowDown /></el-icon>
-           </el-button>
-           <template #dropdown>
-             <el-dropdown-menu>
-               <el-dropdown-item command="NotStarted">未开始</el-dropdown-item>
-               <el-dropdown-item command="Playing">游玩中</el-dropdown-item>
-               <el-dropdown-item command="Finished">已通关</el-dropdown-item>
-               <el-dropdown-item command="Shelved">搁置</el-dropdown-item>
-             </el-dropdown-menu>
-           </template>
-        </el-dropdown>
-      </div>
-      <div class="snapshots-list">
-        <div
-          v-for="snapshot in snapshots"
-          :key="snapshot.date"
-          class="snapshot-item"
-        >
-          <div class="snapshot-info">
-            <div class="snapshot-header">
-              <span class="snapshot-date">{{ formatDate(snapshot.date) }}</span>
-              <el-tag size="small" v-if="snapshot.device_id">{{ snapshot.device_id.substring(0, 8) }}</el-tag>
-            </div>
-            <span class="snapshot-desc">{{ snapshot.describe || '无备注' }}</span>
-            <span class="snapshot-size">{{ formatSize(snapshot.size) }}</span>
-          </div>
-          <div class="snapshot-actions">
-            <el-button size="small" type="primary" @click="restoreSnapshot(snapshot)">
-              <el-icon><RefreshRight /></el-icon>
-              恢复
-            </el-button>
-            <el-button size="small" type="danger" @click="deleteSnapshot(snapshot)">
-              <el-icon><Delete /></el-icon>
-              删除
-            </el-button>
-          </div>
-        </div>
-        <el-empty v-if="snapshots.length === 0" description="暂无快照" />
-      </div>
-    </el-drawer>
+    <!-- 游戏详情页 -->
+    <GameDetails
+      v-else-if="showSnapshots"
+      :game="selectedGame"
+      :snapshots="snapshots"
+      :cloud-enabled="cloudEnabled"
+      @close="showSnapshots = false"
+      @create-snapshot="createSnapshot"
+      @restore-snapshot="restoreSnapshot"
+      @delete-snapshot="deleteSnapshot"
+      @open-backup="openBackupFolder"
+      @open-scraper="openScraper"
+      @delete-cloud-backups="deleteCloudBackups"
+      @change-status="handleStatusChange"
+      @launch-game="launchGame"
+    />
 
     <!-- 添加/编辑游戏对话框 -->
     <el-dialog v-model="showAddGameDialog" :title="editingGame ? '编辑游戏' : '添加游戏'" width="550px" @closed="handleGameDialogClosed">
@@ -338,13 +263,37 @@
 
         <template v-if="cloudSettings.type === 'GitHub'">
           <el-alert type="info" :closable="false" style="margin-bottom: 16px">
-            请使用 GitHub Personal Access Token (Repo Scope)
+            请使用 GitHub Personal Access Token (Repo Scope) 或者使用一键授权自动配置。
           </el-alert>
+          <div style="margin-bottom: 20px;">
+             <el-button 
+               v-if="!githubDeviceCode" 
+               type="success" 
+               @click="startGithubOauthFlow" 
+               :loading="githubOauthLoading"
+               style="width: 100%; height: 40px; font-size: 16px; font-weight: bold; border-radius: 8px;"
+             >
+               🚀 一键连接 GitHub 云同步 (推荐)
+             </el-button>
+             <div v-else style="padding: 15px; border: 1px solid #e4e7ed; border-radius: 4px; background: #fafafa; text-align: center;">
+                 <div style="font-size: 14px; margin-bottom: 10px;">
+                    正在等待您的授权... 如果浏览器没有自动打开，请手动访问：<br>
+                    <a :href="githubVerificationUri" target="_blank">{{ githubVerificationUri }}</a>
+                 </div>
+                 <div style="font-size: 20px; font-weight: bold; letter-spacing: 2px; margin-bottom: 10px; padding: 10px; background: #fff; border: 1px dashed #ccc;">
+                    {{ githubDeviceCode }}
+                 </div>
+                 <div style="font-size: 12px; color: #999;">
+                    请在浏览器中输入或者确认上述验证码
+                    <el-icon class="is-loading"><Loading /></el-icon>
+                 </div>
+             </div>
+          </div>
           <el-form-item label="仓库名">
             <el-input v-model="cloudSettings.repo" placeholder="username/repo" />
           </el-form-item>
           <el-form-item label="分支">
-            <el-input v-model="cloudSettings.branch" placeholder="master" />
+            <el-input v-model="cloudSettings.branch" placeholder="main" />
           </el-form-item>
           <el-form-item label="Token">
             <el-input v-model="cloudSettings.token" type="password" show-password placeholder="ghp_..." />
@@ -376,6 +325,52 @@
         <el-button type="primary" @click="saveCloudSettings">保存设置</el-button>
       </template>
     </el-dialog>
+
+    <!-- 云同步冲突解决对话框 -->
+    <el-dialog v-model="showConflictDialog" title="☁️ 云同步冲突检测" width="550px" :close-on-click-modal="false" :show-close="false">
+      <div class="conflict-dialog-body" v-if="conflictGame">
+        <el-alert
+          type="warning"
+          show-icon
+          :closable="false"
+          style="margin-bottom: 20px;"
+        >
+          <template #title>
+             发现存档冲突: <b>{{ conflictGame.name }}</b>
+          </template>
+          两端存档发生了离散变动。您的本地数据与网络可能产生了并行变更，请选择你要保留哪一方的数据。<br>
+          <small>（如果选择云端，您的本地现有数据将会被保存至安全目录下 <code>.bak_saves</code>）</small>
+        </el-alert>
+        
+        <div class="conflict-actions" style="display: flex; justify-content: space-between; align-items: center;">
+           <el-button class="conflict-btn local-btn" @click="resolveConflict('local')" type="primary" plain style="flex:1; height: auto; padding: 15px; text-align: left;">
+              <div class="btn-content" style="display: flex; gap: 10px; align-items: center;">
+                 <el-icon :size="32"><Upload /></el-icon>
+                 <div class="btn-text">
+                   <div style="font-weight: bold; font-size: 16px;">保留本地上传到云端</div>
+                   <div style="font-size: 12px; color: #666; margin-top: 4px; white-space: normal; line-height: 1.4;">覆盖云端记录。</div>
+                 </div>
+              </div>
+           </el-button>
+
+           <div style="margin: 0 15px; color: #999;">OR</div>
+
+           <el-button class="conflict-btn cloud-btn" @click="resolveConflict('cloud')" type="success" plain style="flex:1; height: auto; padding: 15px; text-align: left;">
+              <div class="btn-content" style="display: flex; gap: 10px; align-items: center;">
+                 <el-icon :size="32"><Download /></el-icon>
+                 <div class="btn-text">
+                   <div style="font-weight: bold; font-size: 16px;">下载覆盖这台机子</div>
+                   <div style="font-size: 12px; color: #666; margin-top: 4px; white-space: normal; line-height: 1.4;">使用上次同步的云进度。</div>
+                 </div>
+              </div>
+           </el-button>
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="showConflictDialog = false">稍后处理</el-button>
+      </template>
+    </el-dialog>
+
     <!-- 搜刮元数据对话框 -->
     <el-dialog v-model="showScraperDialog" title="搜刮元数据 (VNDB)" width="700px">
       <div class="scraper-header">
@@ -437,8 +432,10 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   Search, Plus, Upload, FolderOpened, Picture,
   DocumentAdd, Delete, Setting, Edit, RefreshRight,
-  Folder, Connection, Download, VideoPlay, MagicStick, ArrowDown
+  Folder, Connection, Download, VideoPlay, MagicStick, ArrowDown,
+  CopyDocument, Loading
 } from '@element-plus/icons-vue'
+import GameDetails from './GameDetails.vue'
 
 // State
 const games = ref([])
@@ -458,6 +455,14 @@ const editingOriginalName = ref(null)
 const coverCache = ref({})
 const filterStatus = ref('All')
 const unlistenFns = []
+
+const showConflictDialog = ref(false)
+const conflictGame = ref(null)
+const conflictDirection = ref('') // 'to_cloud' | 'from_cloud'
+
+const githubDeviceCode = ref('')
+const githubVerificationUri = ref('')
+const githubOauthLoading = ref(false)
 
 const filteredGames = computed(() => {
   let result = games.value
@@ -490,7 +495,7 @@ const cloudSettings = ref({
   accessKeyId: '',
   secretAccessKey: '',
   repo: '',
-  branch: 'master',
+  branch: 'main',
   token: '',
   rootPath: '/galgame-saves',
   autoSync: false
@@ -604,11 +609,12 @@ async function loadCloudSettings() {
         accessKeyId: backend.access_key_id || '',
         secretAccessKey: backend.secret_access_key || backend.access_key_secret || '',
         repo: (backend.owner && backend.repo) ? `${backend.owner}/${backend.repo}` : '',
-        branch: backend.branch || 'master',
+        branch: backend.branch || 'main',
         token: backend.token || '',
         rootPath: config.cloud_settings.root_path || '/galgame-saves',
         autoSync: config.cloud_settings.always_sync || false
       }
+      console.log('Loaded cloud settings:', cloudSettings.value)
     }
   } catch (e) {
     console.error('加载云设置失败:', e)
@@ -957,39 +963,6 @@ async function deleteGame(game) {
   }
 }
 
-async function syncToCloud() {
-  syncing.value = true
-  try {
-    const count = await invoke('galgame_sync_to_cloud')
-    ElMessage.success(`已同步 ${count} 个文件到云端`)
-  } catch (e) {
-    ElMessage.error('同步失败: ' + e)
-  } finally {
-    syncing.value = false
-  }
-}
-
-async function syncFromCloud() {
-  syncingFrom.value = true
-  try {
-    const count = await invoke('galgame_sync_from_cloud')
-    ElMessage.success(`已从云端拉取 ${count} 个文件`)
-    await loadGames()
-    
-    if (selectedGame.value) {
-      const updated = games.value.find(g => g.name === selectedGame.value.name)
-      if (updated) {
-        selectedGame.value = updated
-        loadSnapshots(updated)
-      }
-    }
-  } catch (e) {
-    ElMessage.error('拉取失败: ' + e)
-  } finally {
-    syncingFrom.value = false
-  }
-}
-
 async function testCloudConnection() {
   testingCloud.value = true
   try {
@@ -1058,12 +1031,58 @@ function buildBackendObject() {
       type: 'GitHub',
       owner: (owner || '').trim(),
       repo: (repo || '').trim(),
-      branch: (cloudSettings.value.branch || 'master').trim(),
+      branch: (cloudSettings.value.branch || 'main').trim(),
       token: (cloudSettings.value.token || '').trim()
     }
   }
   
   return { type: 'Disabled' }
+}
+
+async function startGithubOauthFlow() {
+  if (githubOauthLoading.value) return;
+  githubOauthLoading.value = true;
+  
+  try {
+    // 1. Request Device Code
+    const res = await invoke('galgame_github_oauth_request');
+    githubDeviceCode.value = res.user_code;
+    githubVerificationUri.value = res.verification_uri;
+    
+    // Automatically open the browser for the user
+    await invoke('open_external_url', { url: res.verification_uri });
+    
+    // 2. Poll for the Access Token
+    const interval = res.interval;
+    const expiresIn = res.expires_in;
+    
+    // We start a background task to poll in rust, which will block until success, timeout or fatal error.
+    const token = await invoke('galgame_github_oauth_poll', {
+        deviceCode: res.device_code,
+        interval: interval,
+        expiresIn: expiresIn
+    });
+    
+    ElMessage.success('GitHub 授权成功！正在自动配置仓库...');
+    
+    // 3. Setup Repository Using the Token
+    const repoPath = await invoke('galgame_github_setup_repo', { token: token });
+    
+    // 4. Update the UI settings form automatically
+    cloudSettings.value.type = 'GitHub';
+    cloudSettings.value.repo = repoPath;
+    cloudSettings.value.branch = 'main'; // using main as standard for new repos
+    cloudSettings.value.token = token;
+    
+    ElMessage.success(`仓库 ${repoPath} 设置完毕，别忘了点击底部保存！`);
+    
+  } catch (e) {
+    ElMessage.error(`GitHub 授权终止或失败: ${e}`);
+  } finally {
+    githubOauthLoading.value = false;
+    githubDeviceCode.value = '';
+    githubVerificationUri.value = '';
+  }
 }
 
 async function saveCloudSettings() {
@@ -1079,6 +1098,86 @@ async function saveCloudSettings() {
     showCloudSettings.value = false
   } catch (e) {
     ElMessage.error('保存失败: ' + e)
+  }
+}
+
+async function syncToCloud() {
+  if (syncing.value || !cloudEnabled.value) return
+  
+  syncing.value = true
+  try {
+    await invoke('galgame_sync_to_cloud')
+    ElMessage.success('已全部同步至云端')
+    await loadGames()
+  } catch (e) {
+    const errorMsg = String(e)
+    if (errorMsg.includes('SYNC_CONFLICT')) {
+      // Parse the error string or extract the game name if possible
+      const gameMatch = errorMsg.match(/Conflict detected for game: (.+)/)
+      const gameName = gameMatch ? gameMatch[1] : 'Unknown Game'
+      const matchedGame = games.value.find(g => g.name === gameName)
+      
+      conflictGame.value = matchedGame || { name: gameName }
+      conflictDirection.value = 'to_cloud'
+      showConflictDialog.value = true
+    } else {
+      ElMessage.error('上传失败: ' + errorMsg)
+    }
+  } finally {
+    if (!showConflictDialog.value) syncing.value = false
+  }
+}
+
+async function syncFromCloud() {
+  if (syncingFrom.value || !cloudEnabled.value) return
+  
+  syncingFrom.value = true
+  try {
+    await invoke('galgame_sync_from_cloud')
+    ElMessage.success('已从云端拉取存档')
+    await loadGames()
+  } catch (e) {
+    const errorMsg = String(e)
+    if (errorMsg.includes('SYNC_CONFLICT')) {
+      const gameMatch = errorMsg.match(/Conflict detected for game: (.+)/)
+      const gameName = gameMatch ? gameMatch[1] : 'Unknown Game'
+      const matchedGame = games.value.find(g => g.name === gameName)
+      
+      conflictGame.value = matchedGame || { name: gameName }
+      conflictDirection.value = 'from_cloud'
+      showConflictDialog.value = true
+    } else {
+      ElMessage.error('下载失败: ' + errorMsg)
+    }
+  } finally {
+    if (!showConflictDialog.value) syncingFrom.value = false
+  }
+}
+
+async function resolveConflict(choice) {
+  if (!conflictGame.value) return
+  
+  showConflictDialog.value = false
+  const direction = conflictDirection.value
+  const gameName = conflictGame.value.name
+  
+  try {
+    if (direction === 'to_cloud') {
+       syncing.value = true
+       await invoke('galgame_sync_to_cloud', { force: choice })
+       ElMessage.success('冲突已解决，同步完成')
+    } else if (direction === 'from_cloud') {
+       syncingFrom.value = true
+       await invoke('galgame_sync_from_cloud', { force: choice })
+       ElMessage.success('冲突已解决，同步完成')
+    }
+    await loadGames()
+  } catch (e) {
+    ElMessage.error(`合并失败: ${e}`)
+  } finally {
+    syncing.value = false
+    syncingFrom.value = false
+    conflictGame.value = null
   }
 }
 
@@ -1171,7 +1270,13 @@ const applyMetadata = async () => {
   }
 }
 
-defineExpose({ showCloudSettings })
+defineExpose({ 
+  showCloudSettings,
+  githubDeviceCode,
+  githubVerificationUri,
+  githubOauthLoading,
+  startGithubOauthFlow
+})
 </script>
 
 <style scoped lang="less">

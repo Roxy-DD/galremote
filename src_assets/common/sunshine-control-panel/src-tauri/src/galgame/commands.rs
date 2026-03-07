@@ -292,36 +292,58 @@ pub async fn galgame_check_cloud_connection(backend: CloudBackend) -> CmdResult<
 }
 
 #[command]
-pub async fn galgame_sync_to_cloud() -> CmdResult<u32> {
+pub async fn galgame_sync_to_cloud(force: Option<String>) -> CmdResult<u32> {
     let cfg = load_config().map_err(|e| format!("Failed to load config: {}", e))?;
-    let backup_dir = get_backup_dir();
+    let mut total_count = 0;
     
-    // 1. Sync files
-    let count = super::cloud::sync_all_to_cloud(&cfg.cloud_settings.backend, &cfg.cloud_settings, &backup_dir).await
-        .map_err(|e| format!("Sync files failed: {}", e))?;
+    // 1. Sync files per game (Delta Sync)
+    for game in &cfg.games {
+        match super::cloud::sync_all_to_cloud(&cfg.cloud_settings.backend, &cfg.cloud_settings, game, &cfg.device_id, force.as_deref()).await {
+            Ok(count) => total_count += count,
+            Err(e) => {
+                log::error!("Failed to sync game {}: {}", game.name, e);
+                if e.to_string().contains("SYNC_CONFLICT") {
+                    return Err(format!("SYNC_CONFLICT: Conflict detected for game: {}", game.name));
+                } else {
+                    return Err(format!("Failed to sync {}: {}", game.name, e));
+                }
+            }
+        }
+    }
 
     // 2. Sync config (Metadata, Status, PlayTime)
     sync_config_to_cloud(&cfg).await?;
     
-    Ok(count)
+    Ok(total_count)
 }
 
 #[command]
-pub async fn galgame_sync_from_cloud() -> CmdResult<u32> {
+pub async fn galgame_sync_from_cloud(force: Option<String>) -> CmdResult<u32> {
     // Reload config in case it changed
     let mut cfg = load_config().map_err(|e| format!("Failed to load config: {}", e))?;
-    let backup_dir = get_backup_dir();
+    let mut total_count = 0;
     
-    // 1. Sync files
-    let count = super::cloud::sync_all_from_cloud(&cfg.cloud_settings.backend, &cfg.cloud_settings, &backup_dir).await
-        .map_err(|e| format!("Sync files failed: {}", e))?;
+    // 1. Sync files per game (Delta Sync)
+    for game in &cfg.games {
+        match super::cloud::sync_all_from_cloud(&cfg.cloud_settings.backend, &cfg.cloud_settings, game, &cfg.device_id, force.as_deref()).await {
+            Ok(count) => total_count += count,
+            Err(e) => {
+                log::error!("Failed to sync from cloud for game {}: {}", game.name, e);
+                if e.to_string().contains("SYNC_CONFLICT") {
+                    return Err(format!("SYNC_CONFLICT: Conflict detected for game: {}", game.name));
+                } else {
+                    return Err(format!("Failed to download {}: {}", game.name, e));
+                }
+            }
+        }
+    }
 
     // 2. Sync config (Metadata, Status, PlayTime)
     if sync_config_from_cloud(&mut cfg).await? {
         save_config(&cfg).map_err(|e| format!("Failed to save merged config: {}", e))?;
     }
     
-    Ok(count)
+    Ok(total_count)
 }
 
 async fn sync_config_to_cloud(cfg: &GalgameConfig) -> CmdResult<()> {
@@ -651,4 +673,25 @@ pub async fn galgame_apply_metadata(game_name: String, data: super::scraper::Vnd
      } else {
          Err(format!("Game not found: {}", game_name))
      }
+}
+
+#[command]
+pub async fn galgame_github_oauth_request() -> CmdResult<crate::network::github_oauth::DeviceCodeResponse> {
+    crate::network::github_oauth::request_device_code()
+        .await
+        .map_err(|e| format!("Request failed: {}", e))
+}
+
+#[command]
+pub async fn galgame_github_oauth_poll(device_code: String, interval: u64, expires_in: u64) -> CmdResult<String> {
+    crate::network::github_oauth::poll_for_access_token(device_code, interval, expires_in)
+        .await
+        .map_err(|e| format!("Poll failed: {}", e))
+}
+
+#[command]
+pub async fn galgame_github_setup_repo(token: String) -> CmdResult<String> {
+    crate::network::github_oauth::setup_github_repository(&token)
+        .await
+        .map_err(|e| format!("Setup failed: {}", e))
 }
