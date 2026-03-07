@@ -196,6 +196,11 @@ jobs:
           echo "  GCC: $(gcc --version | head -1)"
           echo "  Cargo: $(cargo --version)"
 
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "src_assets/common/sunshine-control-panel/src-tauri -> target"
+
       - name: Build Windows
         shell: msys2 {0}
         env:
