@@ -1,0 +1,22 @@
+
+> sunshine-gui@1.1.0 build:renderer
+> vite build --config vite.config.js
+
+[36mvite v4.5.14 [32mbuilding for production...[36m[39m
+transforming...
+[32m鉁?[39m 1190 modules transformed.
+[32m鉁?built in 3.94s[39m
+[vite:vue] Invalid end tag.
+file: D:/椤圭洰鏂囦欢/code/galremote/src_assets/common/sunshine-control-panel/src/renderer/components/GalgameManager.vue:406:3
+error during build:
+SyntaxError: Invalid end tag.
+    at createCompilerError (D:\椤圭洰鏂囦欢\code\galremote\src_assets\common\sunshine-control-panel\node_modules\@vue\compiler-core\dist\compiler-core.cjs.prod.js:1374:17)
+    at emitError (D:\椤圭洰鏂囦欢\code\galremote\src_assets\common\sunshine-control-panel\node_modules\@vue\compiler-core\dist\compiler-core.cjs.prod.js:2980:5)
+    at Object.onclosetag (D:\椤圭洰鏂囦欢\code\galremote\src_assets\common\sunshine-control-panel\node_modules\@vue\compiler-core\dist\compiler-core.cjs.prod.js:2387:9)
+    at Tokenizer.stateInClosingTagName (D:\椤圭洰鏂囦欢\code\galremote\src_assets\common\sunshine-control-panel\node_modules\@vue\compiler-core\dist\compiler-core.cjs.prod.js:799:16)
+    at Tokenizer.parse (D:\椤圭洰鏂囦欢\code\galremote\src_assets\common\sunshine-control-panel\node_modules\@vue\compiler-core\dist\compiler-core.cjs.prod.js:1157:16)
+    at Object.baseParse (D:\椤圭洰鏂囦欢\code\galremote\src_assets\common\sunshine-control-panel\node_modules\@vue\compiler-core\dist\compiler-core.cjs.prod.js:3012:13)
+    at Object.parse (D:\椤圭洰鏂囦欢\code\galremote\src_assets\common\sunshine-control-panel\node_modules\@vue\compiler-dom\dist\compiler-dom.cjs.prod.js:665:23)
+    at Object.parse$1 [as parse] (D:\椤圭洰鏂囦欢\code\galremote\src_assets\common\sunshine-control-panel\node_modules\@vue\compiler-sfc\dist\compiler-sfc.cjs.js:1824:24)
+    at createDescriptor (file:///D:/%E9%A1%B9%E7%9B%AE%E6%96%87%E4%BB%B6/code/galremote/src_assets/common/sunshine-control-panel/node_modules/@vitejs/plugin-vue/dist/index.mjs:74:43)
+    at transformMain (file:///D:/%E9%A1%B9%E7%9B%AE%E6%96%87%E4%BB%B6/code/galremote/src_assets/common/sunshine-control-panel/node_modules/@vitejs/plugin-vue/dist/index.mjs:2319:34)

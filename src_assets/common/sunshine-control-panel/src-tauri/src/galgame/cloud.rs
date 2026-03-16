@@ -4,7 +4,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
-use filetime::FileTime;
 use sha2::{Digest, Sha256};
 
 #[derive(Error, Debug)]
@@ -219,9 +218,6 @@ impl SyncManifest {
                         changes.insert(path.clone(), SyncStatus::UpToDate);
                     } else if local_meta.mtime > cloud_meta.mtime {
                         // 本地改动且较新 (可能是继续游玩) 
-                        // 在真正的 Git 3Way 中需要一个 Base，如果没有 Base，只能依据时间戳，或一律抛出 Conflict
-                        // 这里我们使用简化版冲突检测：如果云端的 DeviceID 不是本机，且本地的时间戳更晚，我们警告冲突
-                        // 如果最后修改 Device 是本机，说明是在本机续玩，LocalNewer
                         if cloud_manifest.base_device_id != local.base_device_id {
                             changes.insert(path.clone(), SyncStatus::Conflict);
                         } else {
@@ -237,8 +233,8 @@ impl SyncManifest {
                 }
             }
 
-            // 找出云端存在但本地没有的文件 (通常代表云端有新游戏进度，或者本来被删除了)
-            for (path, cloud_meta) in &cloud_manifest.files {
+            // 找出云端存在但本地没有的文件 (通常代表云端有新游戏进度)
+            for (path, _cloud_meta) in &cloud_manifest.files {
                 if !local.files.contains_key(path) {
                     changes.insert(path.clone(), SyncStatus::CloudNewer);
                 }
@@ -265,7 +261,24 @@ pub fn calculate_file_hash(path: &Path) -> CloudResult<String> {
 
 impl CloudBackend {
     /// 获取 OpenDAL Operator
-    pub fn get_operator(&self, root_path: &str) -> CloudResult<Operator> {
+    pub fn get_operator(&self, root_path: &str, proxy: Option<&str>) -> CloudResult<Operator> {
+        use opendal::raw::HttpClient;
+        
+        // 创建配置了代理的 reqwest Client
+        let mut client_builder = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(60))
+            .user_agent("GalRemote-App");
+
+        if let Some(p) = proxy {
+            if !p.trim().is_empty() {
+                client_builder = client_builder.proxy(reqwest::Proxy::all(p).map_err(|e| CloudError::CheckFailed(e.to_string()))?);
+            }
+        }
+        
+        let reqwest_client = client_builder.build().map_err(|e| CloudError::CheckFailed(e.to_string()))?;
+        // 包装为 OpenDAL 的 HttpClient
+        let http_client = HttpClient::with(reqwest_client);
+
         match self {
             CloudBackend::Disabled => Err(CloudError::Disabled),
             
@@ -274,7 +287,9 @@ impl CloudBackend {
                     .endpoint(endpoint)
                     .username(username)
                     .password(password)
-                    .root(root_path);
+                    .root(root_path)
+                    .http_client(http_client);
+                
                 Ok(Operator::new(builder)?.finish())
             }
             
@@ -285,17 +300,21 @@ impl CloudBackend {
                     .region(region)
                     .access_key_id(access_key_id)
                     .secret_access_key(secret_access_key)
-                    .root(root_path);
+                    .root(root_path)
+                    .http_client(http_client);
+                
                 Ok(Operator::new(builder)?.finish())
             }
-
+ 
             CloudBackend::AliyunOSS { endpoint, bucket, access_key_id, access_key_secret } => {
                 let builder = services::Oss::default()
                     .endpoint(endpoint)
                     .bucket(bucket)
                     .access_key_id(access_key_id)
                     .access_key_secret(access_key_secret)
-                    .root(root_path);
+                    .root(root_path)
+                    .http_client(http_client);
+                    
                 Ok(Operator::new(builder)?.finish())
             }
             
@@ -303,14 +322,15 @@ impl CloudBackend {
             CloudBackend::OneDrive { .. } | CloudBackend::GoogleDrive { .. } => {
                 Err(CloudError::CheckFailed("OneDrive/Google Drive not yet implemented".into()))
             }
-
-            CloudBackend::GitHub { owner, repo, branch, token } => {
+ 
+            CloudBackend::GitHub { owner, repo, branch: _, token } => {
                 let builder = services::Github::default()
                     .owner(owner)
                     .repo(repo)
                     .token(token)
-                    .root(root_path);
-                
+                    .root(root_path)
+                    .http_client(http_client);
+                    
                 Ok(Operator::new(builder)?.finish())
             }
         }
@@ -319,8 +339,8 @@ impl CloudBackend {
 
 
     /// 上传剪贴板文本到云端
-    pub async fn upload_clipboard(&self, root_path: &str, text: &str) -> CloudResult<()> {
-        let op = self.get_operator(root_path)?;
+    pub async fn upload_clipboard(&self, root_path: &str, text: &str, proxy: Option<&str>) -> CloudResult<()> {
+        let op = self.get_operator(root_path, proxy)?;
         // 固定使用 clipboard.txt 作为同步文件
         let path = "clipboard.txt";
         
@@ -332,8 +352,8 @@ impl CloudBackend {
     }
 
     /// 从云端下载剪贴板文本
-    pub async fn download_clipboard(&self, root_path: &str) -> CloudResult<String> {
-        let op = self.get_operator(root_path)?;
+    pub async fn download_clipboard(&self, root_path: &str, proxy: Option<&str>) -> CloudResult<String> {
+        let op = self.get_operator(root_path, proxy)?;
         let path = "clipboard.txt";
         
         let content = op.read(path)
@@ -348,11 +368,11 @@ impl CloudBackend {
     }
 
     /// 测试连接
-    pub async fn check_connection(&self, root_path: &str) -> CloudResult<()> {
+    pub async fn check_connection(&self, root_path: &str, proxy: Option<&str>) -> CloudResult<()> {
         const TEST_FILE: &str = ".connection_test";
         const TEST_CONTENT: &str = "sunshine-gui connection test";
-
-        let op = self.get_operator(root_path)?;
+ 
+        let op = self.get_operator(root_path, proxy)?;
 
         // 1. 创建测试文件
         op.write(TEST_FILE, TEST_CONTENT)
@@ -400,8 +420,9 @@ pub async fn upload_file(
     root_path: &str,
     local_path: &Path,
     remote_path: &str,
+    proxy: Option<&str>,
 ) -> CloudResult<()> {
-    let op = backend.get_operator(root_path)?;
+    let op = backend.get_operator(root_path, proxy)?;
     let content = std::fs::read(local_path)?;
     op.write(remote_path, content).await?;
     log::info!("Uploaded {} to {}", local_path.display(), remote_path);
@@ -415,8 +436,9 @@ pub async fn download_file(
     root_path: &str,
     remote_path: &str,
     local_path: &Path,
+    proxy: Option<&str>,
 ) -> CloudResult<()> {
-    let op = backend.get_operator(root_path)?;
+    let op = backend.get_operator(root_path, proxy)?;
     let content = op.read(remote_path).await?;
     
     if let Some(parent) = local_path.parent() {
@@ -433,8 +455,9 @@ pub async fn list_remote_files(
     backend: &CloudBackend,
     root_path: &str,
     path: &str,
+    proxy: Option<&str>,
 ) -> CloudResult<Vec<String>> {
-    let op = backend.get_operator(root_path)?;
+    let op = backend.get_operator(root_path, proxy)?;
     let entries = op.list(path).await?;
     Ok(entries.into_iter().map(|e| e.name().to_string()).collect())
 }
@@ -444,8 +467,9 @@ pub async fn delete_directory(
     backend: &CloudBackend,
     settings: &CloudSettings,
     dir_path: &str,
+    proxy: Option<&str>,
 ) -> CloudResult<()> {
-    let op = backend.get_operator(&settings.root_path)?;
+    let op = backend.get_operator(&settings.root_path, proxy)?;
     let prefix = if dir_path.ends_with('/') {
         dir_path.to_string()
     } else {
@@ -505,8 +529,9 @@ pub async fn sync_all_to_cloud(
     game: &crate::galgame::game::Game,
     device_id: &str,
     force: Option<&str>,
+    proxy: Option<&str>,
 ) -> CloudResult<u32> {
-    let op = backend.get_operator(&settings.root_path)?;
+    let op = backend.get_operator(&settings.root_path, proxy)?;
     let mut count = 0;
 
     let game_cloud_dir = format!("{}/{}", settings.root_path.trim_end_matches('/'), game.name);
@@ -617,8 +642,9 @@ pub async fn sync_all_from_cloud(
     game: &crate::galgame::game::Game,
     device_id: &str,
     force: Option<&str>,
+    proxy: Option<&str>,
 ) -> CloudResult<u32> {
-    let op = backend.get_operator(&settings.root_path)?;
+    let op = backend.get_operator(&settings.root_path, proxy)?;
     let mut count = 0;
 
     let game_cloud_dir = format!("{}/{}", settings.root_path.trim_end_matches('/'), game.name);

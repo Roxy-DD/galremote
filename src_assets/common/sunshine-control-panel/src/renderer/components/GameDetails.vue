@@ -16,11 +16,22 @@
             </el-image>
           </div>
           
-          <div class="game-title-area">
-            <h1>{{ game.name }}</h1>
+            <div class="title-with-score">
+              <h1>{{ game.name }}</h1>
+              <div class="game-score-badge" v-if="game.score">
+                <el-icon><StarFilled /></el-icon>
+                <span>{{ (game.score / 10).toFixed(1) }}</span>
+              </div>
+            </div>
             <div class="game-meta-tags">
               <el-tag size="small" type="info" v-if="game.developer">{{ game.developer }}</el-tag>
               <el-tag size="small" type="info" v-if="game.release_date">{{ game.release_date }}</el-tag>
+              
+              <div class="platform-indicators" v-if="game.platforms && game.platforms.length">
+                <el-tag v-for="p in game.platforms" :key="p" size="small" effect="plain" class="platform-tag">
+                  {{ p }}
+                </el-tag>
+              </div>
               
               <el-dropdown trigger="click" @command="$emit('change-status', $event)">
                  <el-button class="status-btn-small" :type="getGameStatusType(game.status)" size="small" round>
@@ -30,7 +41,9 @@
                    <el-dropdown-menu>
                      <el-dropdown-item command="NotStarted">未开始</el-dropdown-item>
                      <el-dropdown-item command="Playing">游玩中</el-dropdown-item>
+                      <el-dropdown-item command="Partial">部分通关</el-dropdown-item>
                      <el-dropdown-item command="Finished">已通关</el-dropdown-item>
+                      <el-dropdown-item command="Multiple">多周目</el-dropdown-item>
                      <el-dropdown-item command="Shelved">搁置</el-dropdown-item>
                    </el-dropdown-menu>
                  </template>
@@ -80,8 +93,24 @@
           <div class="overview-pane">
             <div class="description-card">
               <h3>关于游戏</h3>
-              <p v-if="game.description">{{ game.description }}</p>
-              <el-empty v-else description="暂无游戏简介，请点击下方搜刮元数据获取" :image-size="60"></el-empty>
+              <p v-if="game.description" class="description-text">{{ game.description }}</p>
+              <el-empty v-else description="暂无游戏简介" :image-size="60"></el-empty>
+              
+              <div class="additional-meta" v-if="(game.genres && game.genres.length) || (game.tags && game.tags.length)">
+                <div class="meta-block" v-if="game.genres && game.genres.length">
+                  <h4>类型</h4>
+                  <div class="tag-group">
+                    <el-tag v-for="g in game.genres" :key="g" size="small" effect="light">{{ g }}</el-tag>
+                  </div>
+                </div>
+                <div class="meta-block" v-if="game.tags && game.tags.length">
+                  <h4>标签</h4>
+                  <div class="tag-group">
+                    <el-tag v-for="t in game.tags.slice(0, 15)" :key="t" size="small" type="info" effect="plain">{{ t }}</el-tag>
+                    <span v-if="game.tags.length > 15" class="more-tags">...</span>
+                  </div>
+                </div>
+              </div>
               
               <div style="margin-top: 20px;">
                 <el-button type="primary" plain @click="$emit('open-scraper', game)">
@@ -160,7 +189,7 @@
 import { ref, computed } from 'vue'
 import {
   ArrowLeft, Picture, VideoPlay, ArrowDown, Check, Close,
-  Plus, FolderOpened, MagicStick, Delete, Calendar
+  Plus, FolderOpened, MagicStick, Delete, Calendar, StarFilled
 } from '@element-plus/icons-vue'
 
 const props = defineProps({
@@ -201,7 +230,9 @@ function getGameStatusType(status) {
   const map = {
     NotStarted: 'info',
     Playing: 'primary',
+    Partial: '',
     Finished: 'success',
+    Multiple: 'danger',
     Shelved: 'warning',
   }
   return map[status] || 'info'
@@ -211,7 +242,9 @@ function getGameStatusLabel(status) {
   const map = {
     NotStarted: '未开始',
     Playing: '游玩中',
+    Partial: '部分通关',
     Finished: '已通关',
+    Multiple: '多周目',
     Shelved: '搁置',
   }
   return map[status] || '未知'
@@ -340,9 +373,47 @@ function formatSize(bytes) {
   
   h1 {
     font-size: 42px;
-    margin: 0 0 15px 0;
+    margin: 0;
     text-shadow: 0 2px 4px rgba(0,0,0,0.5);
     font-weight: 700;
+  }
+}
+
+.title-with-score {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 15px;
+}
+
+.game-score-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255, 193, 7, 0.2);
+  border: 1px solid rgba(255, 193, 7, 0.4);
+  color: #ffc107;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-weight: bold;
+  font-size: 18px;
+  
+  .el-icon {
+    font-size: 16px;
+  }
+}
+
+.platform-indicators {
+  display: flex;
+  gap: 8px;
+  margin-right: 12px;
+  
+  .platform-tag {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #bbb;
+    font-size: 11px;
+    text-transform: uppercase;
   }
 }
 
@@ -448,6 +519,40 @@ function formatSize(bytes) {
     margin-top: 0;
     margin-bottom: 16px;
     color: var(--el-text-color-primary);
+  }
+}
+
+.description-text {
+  white-space: pre-wrap;
+  color: var(--el-text-color-regular);
+}
+
+.additional-meta {
+  margin-top: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding-top: 24px;
+  border-top: 1px solid var(--el-border-color-lighter);
+}
+
+.meta-block {
+  h4 {
+    margin: 0 0 12px 0;
+    font-size: 14px;
+    color: var(--el-text-color-secondary);
+  }
+}
+
+.tag-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  
+  .more-tags {
+    font-size: 12px;
+    color: var(--el-text-color-secondary);
+    align-self: flex-end;
   }
 }
 

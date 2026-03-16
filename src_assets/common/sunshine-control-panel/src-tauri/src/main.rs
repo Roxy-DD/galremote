@@ -101,7 +101,6 @@ fn main() {
             galgame::commands::galgame_add_game,
             galgame::commands::galgame_delete_game,
             galgame::commands::galgame_list_games,
-            galgame::commands::galgame_create_snapshot,
             galgame::commands::galgame_restore_snapshot,
             galgame::commands::galgame_list_snapshots,
             galgame::commands::galgame_delete_snapshot,
@@ -121,6 +120,16 @@ fn main() {
             galgame::commands::galgame_github_oauth_request,
             galgame::commands::galgame_github_oauth_poll,
             galgame::commands::galgame_github_setup_repo,
+            galgame::commands::galgame_get_running_game,
+            galgame::commands::galgame_kill_game,
+            galgame::commands::galgame_batch_add_games,
+            galgame::commands::galgame_list_collections,
+            galgame::commands::galgame_add_collection,
+            galgame::commands::galgame_delete_collection,
+            galgame::commands::galgame_update_collection,
+            galgame::commands::galgame_add_to_collection,
+            galgame::commands::galgame_remove_from_collection,
+            galgame::commands::galgame_prune_config,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

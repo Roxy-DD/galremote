@@ -114,10 +114,31 @@
         <div class="menu-section">
           <p v-if="!isCollapsed" class="section-title">存档管理</p>
 
-          <div class="menu-item" :class="{ active: showGalgameManager }" @click="openGalgameManager">
+          <div class="menu-item" :class="{ active: showGalgameManager && activeManagerView === 'library' }" @click="openManagerView('library')">
             <el-icon :size="20"><Folder /></el-icon>
             <transition name="fade">
-              <span v-if="!isCollapsed">游戏存档</span>
+              <span v-if="!isCollapsed">我的游戏</span>
+            </transition>
+          </div>
+
+          <div class="menu-item" @click="openAddGame">
+            <el-icon :size="20"><Plus /></el-icon>
+            <transition name="fade">
+              <span v-if="!isCollapsed">手动添加</span>
+            </transition>
+          </div>
+
+          <div class="menu-item" @click="openScanDialog">
+            <el-icon :size="20"><Search /></el-icon>
+            <transition name="fade">
+              <span v-if="!isCollapsed">启动扫描</span>
+            </transition>
+          </div>
+
+          <div class="menu-item" :class="{ active: showGalgameManager && activeManagerView === 'records' }" @click="openManagerView('records')">
+            <el-icon :size="20"><DataBoard /></el-icon>
+            <transition name="fade">
+              <span v-if="!isCollapsed">游玩记录</span>
             </transition>
           </div>
 
@@ -269,8 +290,9 @@ const {
 } = useTools()
 
 // Galgame Manager state
-const showGalgameManager = ref(false)
+const showGalgameManager = ref(true)
 const galgameManagerRef = ref(null)
+const activeManagerView = ref('library')
 
 // Tools Page state
 const showToolsPage = ref(false)
@@ -283,16 +305,34 @@ const openAdvancedSettings = () => {
   showToolsPage.value = false
 }
 
-const openGalgameManager = () => {
+const openManagerView = (view = 'library') => {
   showVddSettings.value = false
   showGalgameManager.value = true
   showToolsPage.value = false
+  activeManagerView.value = view
+  
+  // 如果组件已挂载，同步内部视图
   nextTick(() => {
-    // 可以在这里做一些初始化
-    if (galgameManagerRef.value) {
-      // galgameManagerRef.value.refreshGames()
+    if (galgameManagerRef.value && galgameManagerRef.value.setActiveView) {
+      galgameManagerRef.value.setActiveView(view)
     }
   })
+}
+
+const openAddGame = () => {
+  openManagerView('library')
+  setTimeout(() => {
+    if (galgameManagerRef.value) {
+      galgameManagerRef.value.openAddGameDialog()
+    }
+  }, 50)
+}
+
+const openScanDialog = () => {
+  // 保持在当前视图（通常是我的游戏），仅弹出扫描确认框
+  if (galgameManagerRef.value) {
+    galgameManagerRef.value.openScanDialog()
+  }
 }
 
 const openTool = (toolType) => {
@@ -303,11 +343,10 @@ const openTool = (toolType) => {
 }
 
 const openCloudSettings = () => {
-  openGalgameManager()
-  // Use nextTick to ensure component is mounted
+  openManagerView('library')
   setTimeout(() => {
     if (galgameManagerRef.value) {
-      galgameManagerRef.value.showCloudSettings = true
+      galgameManagerRef.value.showSettings = true
     }
   }, 100)
 }

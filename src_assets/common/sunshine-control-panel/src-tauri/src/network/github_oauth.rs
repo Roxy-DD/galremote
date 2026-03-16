@@ -35,11 +35,24 @@ pub struct AccessTokenError {
     pub error_uri: String,
 }
 
-pub async fn request_device_code() -> Result<DeviceCodeResponse, String> {
-    let client = Client::builder()
-        .timeout(Duration::from_secs(15))
-        .build()
-        .map_err(|e| format!("Failed to build client: {}", e))?;
+fn create_client(proxy: Option<&str>) -> Result<Client, String> {
+    let mut builder = Client::builder()
+        .timeout(Duration::from_secs(60))
+        .user_agent("GalRemote-App");
+    
+    if let Some(p) = proxy {
+        if !p.trim().is_empty() {
+            let reqwest_proxy = reqwest::Proxy::all(p)
+                .map_err(|e| format!("Invalid proxy format: {}", e))?;
+            builder = builder.proxy(reqwest_proxy);
+        }
+    }
+    
+    builder.build().map_err(|e| format!("Failed to build client: {}", e))
+}
+
+pub async fn request_device_code(proxy: Option<&str>) -> Result<DeviceCodeResponse, String> {
+    let client = create_client(proxy)?;
     let resp = client
         .post("https://github.com/login/device/code")
         .header("Accept", "application/json")
@@ -60,11 +73,8 @@ pub async fn request_device_code() -> Result<DeviceCodeResponse, String> {
     Ok(code_resp)
 }
 
-pub async fn poll_for_access_token(device_code: String, interval: u64, expires_in: u64) -> Result<String, String> {
-    let client = Client::builder()
-        .timeout(Duration::from_secs(15))
-        .build()
-        .unwrap_or_else(|_| Client::new());
+pub async fn poll_for_access_token(device_code: String, interval: u64, expires_in: u64, proxy: Option<&str>) -> Result<String, String> {
+    let client = create_client(proxy).unwrap_or_else(|_| Client::new());
     let start_time = std::time::Instant::now();
     let duration_limit = Duration::from_secs(expires_in);
     
@@ -124,11 +134,8 @@ pub async fn poll_for_access_token(device_code: String, interval: u64, expires_i
     Err("Timeout waiting for authorization".into())
 }
 
-pub async fn setup_github_repository(token: &str) -> Result<String, String> {
-    let client = Client::builder()
-        .timeout(Duration::from_secs(15))
-        .build()
-        .unwrap_or_else(|_| Client::new());
+pub async fn setup_github_repository(token: &str, proxy: Option<&str>) -> Result<String, String> {
+    let client = create_client(proxy).unwrap_or_else(|_| Client::new());
     let repo_name = "galremote-cloud-saves";
     
     // 1. Get User Profile to find out owner name

@@ -6,7 +6,7 @@
     "build-clean": "cross-env VITE_USE_ROLldOWN=1 vite build --debug --emptyOutDir",
     "dev": "cross-env VITE_USE_ROLldOWN=1 vite build --watch",
     "dev-server": "cross-env VITE_USE_ROLldOWN=1 vite serve --config vite.dev.config.js",
-    "dev-full": "node dev-server.js",
+    "dev-full": "npm run dev-server",
     "preview": "vite preview",
     "preview:build": "npm run build && npm run preview"
   },

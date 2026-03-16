@@ -1,0 +1,14 @@
+   Compiling sunshine-gui v1.1.0 (D:\椤圭洰鏂囦欢\code\galremote\src_assets\common\sunshine-control-panel\src-tauri)
+error[E0502]: cannot borrow `cfg` as mutable because it is also borrowed as immutable
+   --> src\galgame\commands.rs:371:31
+    |
+355 |     let proxy = if cfg.settings.http_proxy.is_empty() { None } else { Some(cfg.settings.http_proxy.as_str()) };
+    |                                                                            ----------------------- immutable borrow occurs here
+...
+371 |     if sync_config_from_cloud(&mut cfg, proxy).await? {
+    |                               ^^^^^^^^  ----- immutable borrow later used here
+    |                               |
+    |                               mutable borrow occurs here
+
+For more information about this error, try `rustc --explain E0502`.
+error: could not compile `sunshine-gui` (bin "sunshine-gui") due to 1 previous error

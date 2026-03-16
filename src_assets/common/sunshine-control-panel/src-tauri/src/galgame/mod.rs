@@ -3,6 +3,7 @@
 
 pub mod archive;
 pub mod cloud;
+pub mod collection;
 pub mod commands;
 pub mod config;
 pub mod game;

@@ -34,6 +34,10 @@ struct SnapshotMetadata {
     describe: String,
     device_id: String,
     game_name: String,
+    #[serde(default)]
+    status: Option<super::game::GameStatus>,
+    #[serde(default)]
+    total_play_time: Option<u64>,
 }
 
 /// 创建存档快照
@@ -58,11 +62,13 @@ pub fn create_snapshot(
 
     // 1. 写入元数据
     let metadata = SnapshotMetadata {
-        version: "1.0".to_string(),
+        version: "1.1".to_string(), // Updated version
         date: timestamp.clone(),
         describe: describe.to_string(),
         device_id: device_id.to_string(),
         game_name: game.name.clone(),
+        status: Some(game.status.clone()),
+        total_play_time: Some(game.total_play_time),
     };
     let metadata_json = serde_json::to_string_pretty(&metadata)?;
     zip.start_file("sunshine_metadata.json", options)?;
@@ -202,6 +208,8 @@ pub fn create_snapshot(
         path: zip_path.to_string_lossy().to_string(),
         size: Some(total_size),
         parent: None,
+        status: Some(game.status.clone()),
+        total_play_time: Some(game.total_play_time),
     })
 }
 
@@ -442,8 +450,10 @@ pub fn list_snapshots(game_name: &str) -> ArchiveResult<Vec<Snapshot>> {
             if let Some(stem) = path.file_stem() {
                 let date = stem.to_string_lossy().to_string();
                 let metadata = fs::metadata(&path)?;
-                let size = metadata.len();
-                let mut describe = String::new();
+                let snapshot_size: Option<u64> = Some(metadata.len());
+                let mut status: Option<super::game::GameStatus> = None;
+                let mut total_play_time: Option<u64> = None;
+                let mut describe_val = String::new();
 
                 // 尝试读取 ZIP 中的 metadata.json
                 if let Ok(file) = File::open(&path) {
@@ -453,7 +463,9 @@ pub fn list_snapshots(game_name: &str) -> ArchiveResult<Vec<Snapshot>> {
                             if meta_file.read_to_string(&mut content).is_ok() {
                                 if let Ok(meta) = serde_json::from_str::<SnapshotMetadata>(&content)
                                 {
-                                    describe = meta.describe;
+                                    describe_val = meta.describe;
+                                    status = meta.status;
+                                    total_play_time = meta.total_play_time;
                                 }
                             }
                         }
@@ -462,10 +474,12 @@ pub fn list_snapshots(game_name: &str) -> ArchiveResult<Vec<Snapshot>> {
 
                 snapshots.push(Snapshot {
                     date,
-                    describe,
+                    describe: describe_val,
                     path: path.to_string_lossy().to_string(),
-                    size: Some(size),
+                    size: snapshot_size,
                     parent: None,
+                    status,
+                    total_play_time,
                 });
             }
         }

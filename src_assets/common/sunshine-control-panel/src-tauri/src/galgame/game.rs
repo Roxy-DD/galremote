@@ -23,13 +23,17 @@ pub struct SaveUnit {
     pub delete_before_apply: bool,
 }
 
-/// 游戏状态
+/// 游戏状态 (对齐 Vnite playStatus)
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub enum GameStatus {
     #[default]
     NotStarted,
     Playing,
+    /// 部分通关
+    Partial,
     Finished,
+    /// 多周目
+    Multiple,
     Shelved,
 }
 
@@ -44,14 +48,26 @@ pub struct PlaySession {
     pub device_id: String,
 }
 
-/// 游戏信息
+/// 游戏信息 (对齐 Vnite gameDoc)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Game {
     /// 游戏名称
     pub name: String,
+    /// 游戏原名（日文/原文）
+    #[serde(default)]
+    pub original_name: Option<String>,
+    /// 排序用名称
+    #[serde(default)]
+    pub sort_name: Option<String>,
     /// 游戏封面图片路径
     #[serde(default)]
     pub cover_image: Option<String>,
+    /// 背景图片路径
+    #[serde(default)]
+    pub background_image: Option<String>,
+    /// Logo 图片路径
+    #[serde(default)]
+    pub logo_image: Option<String>,
     /// 存档路径列表
     pub save_paths: Vec<SaveUnit>,
     /// 游戏可执行文件路径（启动路径）
@@ -76,18 +92,57 @@ pub struct Game {
     #[serde(default)]
     pub play_history: Vec<PlaySession>,
 
-    /// 游戏简介 (VNDB)
+    // ── 元数据 (对齐 Vnite gameDoc.metadata) ──
+    /// 游戏简介
     #[serde(default)]
     pub description: Option<String>,
-    /// 开发商 (VNDB)
+    /// 主开发商（向后兼容）
     #[serde(default)]
     pub developer: Option<String>,
-    /// 发售日期 (VNDB)
+    /// 开发商列表
+    #[serde(default)]
+    pub developers: Vec<String>,
+    /// 发行商列表
+    #[serde(default)]
+    pub publishers: Vec<String>,
+    /// 发售日期
     #[serde(default)]
     pub release_date: Option<String>,
+    /// 游戏类型 (genres)
+    #[serde(default)]
+    pub genres: Vec<String>,
+    /// 标签 (tags)
+    #[serde(default)]
+    pub tags: Vec<String>,
+    /// 平台列表
+    #[serde(default)]
+    pub platforms: Vec<String>,
+
+    // ── 数据源关联ID ──
+    #[serde(default)]
+    pub steam_id: Option<String>,
+    #[serde(default)]
+    pub vndb_id: Option<String>,
+    #[serde(default)]
+    pub igdb_id: Option<String>,
+    #[serde(default)]
+    pub ymgal_id: Option<String>,
+    #[serde(default)]
+    pub bangumi_id: Option<String>,
+
+    // ── 评分与状态 ──
+    /// 用户评分 (0-100)
+    #[serde(default)]
+    pub score: Option<f32>,
+    /// 搜刮评分 (如VNDB评分)
+    #[serde(default)]
+    pub rating: Option<f32>,
     /// 游戏状态
     #[serde(default)]
     pub status: GameStatus,
+    /// 是否包含 NSFW 内容
+    #[serde(default)]
+    pub nsfw: bool,
 }
 
 /// 备份模式
@@ -120,6 +175,12 @@ pub struct Snapshot {
     /// 父快照（用于分支）
     #[serde(default)]
     pub parent: Option<String>,
+    /// 快照时的游戏状态
+    #[serde(default)]
+    pub status: Option<GameStatus>,
+    /// 快照时的总游玩时间
+    #[serde(default)]
+    pub total_play_time: Option<u64>,
 }
 
 /// 游戏的所有快照
@@ -138,7 +199,11 @@ impl Game {
     pub fn new(name: String) -> Self {
         Self {
             name,
+            original_name: None,
+            sort_name: None,
             cover_image: None,
+            background_image: None,
+            logo_image: None,
             exe_path: None,
             save_paths: Vec::new(),
             game_paths: HashMap::new(),
@@ -149,8 +214,21 @@ impl Game {
             play_history: Vec::new(),
             description: None,
             developer: None,
+            developers: Vec::new(),
+            publishers: Vec::new(),
             release_date: None,
+            genres: Vec::new(),
+            tags: Vec::new(),
+            platforms: Vec::new(),
+            steam_id: None,
+            vndb_id: None,
+            igdb_id: None,
+            ymgal_id: None,
+            bangumi_id: None,
+            score: None,
+            rating: None,
             status: GameStatus::default(),
+            nsfw: false,
         }
     }
 
@@ -186,6 +264,8 @@ impl Snapshot {
             path,
             size: None,
             parent: None,
+            status: None,
+            total_play_time: None,
         }
     }
 }

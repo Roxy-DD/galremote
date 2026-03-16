@@ -16,6 +16,7 @@ body {
   background-color: @background-primary;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow: hidden; /* Prevent body scrollbars */
 }
 
 // 链接样式
@@ -102,20 +103,27 @@ img {
 
 // 滚动条样式
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: @background-secondary;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: @border-color;
-  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 3px;
   
   &:hover {
-    background: @text-secondary;
+    background: rgba(0, 0, 0, 0.2);
+  }
+}
+
+[data-bs-theme="dark"] ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  &:hover {
+    background: rgba(255, 255, 255, 0.2);
   }
 }
 

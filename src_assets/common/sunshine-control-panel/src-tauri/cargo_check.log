@@ -1,0 +1,17 @@
+   Compiling sunshine-gui v1.1.0 (D:\椤圭洰鏂囦欢\code\galremote\src_assets\common\sunshine-control-panel\src-tauri)
+error: unexpected closing delimiter: `}`
+   --> src\galgame\commands.rs:617:5
+    |
+395 | async fn sync_config_from_cloud(local_cfg: &mut GalgameConfig) -> CmdResult<bool> {
+    |                                                                                   - this delimiter might not be properly closed...
+...
+504 |                 _ => {}
+    |                      -- block is empty, you might have not meant to close it
+...
+607 |         } else {
+    |         - ...as it matches this but it has different indentation
+...
+617 |     }
+    |     ^ unexpected closing delimiter
+
+error: could not compile `sunshine-gui` (bin "sunshine-gui") due to 1 previous error

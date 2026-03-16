@@ -1,0 +1,86 @@
+
+> sunshine-gui@1.1.0 build:renderer
+> vite build --config vite.config.js
+
+[36mvite v4.5.14 [32mbuilding for production...[36m[39m
+transforming...
+[32m鉁?[39m 2482 modules transformed.
+rendering chunks...
+[plugin:vite:reporter] 
+(!) D:/椤圭洰鏂囦欢/code/galremote/src_assets/common/sunshine-control-panel/node_modules/@tauri-apps/plugin-dialog/dist-js/index.js is dynamically imported by D:/椤圭洰鏂囦欢/code/galremote/src_assets/common/sunshine-control-panel/src/renderer/components/SunshineFrame.vue but also statically imported by D:/椤圭洰鏂囦欢/code/galremote/src_assets/common/sunshine-control-panel/src/renderer/components/GalgameManager.vue, dynamic import will not move module into another chunk.
+
+computing gzip size...
+[2m../../dist/[22m[32massets/gura-clip-e6679d51.svg                 [39m[1m[2m  0.60 kB[22m[1m[22m[2m 鈹?gzip:   0.38 kB[22m
+[2m../../dist/[22m[32massets/btn-close-buoy-ef1ffe96.svg            [39m[1m[2m  0.70 kB[22m[1m[22m[2m 鈹?gzip:   0.34 kB[22m
+[2m../../dist/[22m[32massets/btn-minimize-buoy-b8956398.svg         [39m[1m[2m  0.72 kB[22m[1m[22m[2m 鈹?gzip:   0.37 kB[22m
+[2m../../dist/[22m[32massets/btn-maximize-buoy-7c67981a.svg         [39m[1m[2m  0.72 kB[22m[1m[22m[2m 鈹?gzip:   0.36 kB[22m
+[2m../../dist/[22m[32massets/btn-restore-buoy-4cf3806d.svg          [39m[1m[2m  0.81 kB[22m[1m[22m[2m 鈹?gzip:   0.36 kB[22m
+[2m../../dist/[22m[32mvdd/index.html                                [39m[1m[2m  0.97 kB[22m[1m[22m[2m 鈹?gzip:   0.40 kB[22m
+[2m../../dist/[22m[32mhome/index.html                               [39m[1m[2m  1.23 kB[22m[1m[22m[2m 鈹?gzip:   0.71 kB[22m
+[2m../../dist/[22m[32mconsole/index.html                            [39m[1m[2m  1.33 kB[22m[1m[22m[2m 鈹?gzip:   0.58 kB[22m
+[2m../../dist/[22m[32mtool-window/index.html                        [39m[1m[2m  1.49 kB[22m[1m[22m[2m 鈹?gzip:   0.58 kB[22m
+[2m../../dist/[22m[32mindex.html                                    [39m[1m[2m  1.54 kB[22m[1m[22m[2m 鈹?gzip:   0.77 kB[22m
+[2m../../dist/[22m[32mtoolbar/index.html                            [39m[1m[2m  1.58 kB[22m[1m[22m[2m 鈹?gzip:   0.60 kB[22m
+[2m../../dist/[22m[32msunshine-frame.html                           [39m[1m[2m  1.72 kB[22m[1m[22m[2m 鈹?gzip:   0.66 kB[22m
+[2m../../dist/[22m[32mdesktop/index.html                            [39m[1m[2m  1.94 kB[22m[1m[22m[2m 鈹?gzip:   0.72 kB[22m
+[2m../../dist/[22m[32mabout/index.html                              [39m[1m[2m  3.73 kB[22m[1m[22m[2m 鈹?gzip:   1.35 kB[22m
+[2m../../dist/[22m[32mplaceholder.html                              [39m[1m[2m  4.02 kB[22m[1m[22m[2m 鈹?gzip:   1.79 kB[22m
+[2m../../dist/[22m[32mstop-clock-canvas/index.html                  [39m[1m[2m  4.31 kB[22m[1m[22m[2m 鈹?gzip:   1.74 kB[22m
+[2m../../dist/[22m[32massets/gura-pix-8af8e33a.png                  [39m[1m[2m 21.45 kB[22m[1m[22m
+[2m../../dist/[22m[32massets/sunshine-c89e0840.ico                  [39m[1m[2m123.13 kB[22m[1m[22m
+[2m../../dist/[22m[32massets/PixelMplus12-Bold-c6c338de.woff2       [39m[1m[2m201.92 kB[22m[1m[22m
+[2m../../dist/[22m[35massets/index-d95e7e7e.css                     [39m[1m[2m  1.13 kB[22m[1m[22m[2m 鈹?gzip:   0.57 kB[22m
+[2m../../dist/[22m[35massets/index-81a04d6a.css                     [39m[1m[2m  1.73 kB[22m[1m[22m[2m 鈹?gzip:   0.80 kB[22m
+[2m../../dist/[22m[35massets/global-f8c32afa.css                    [39m[1m[2m  2.60 kB[22m[1m[22m[2m 鈹?gzip:   1.05 kB[22m
+[2m../../dist/[22m[35massets/ShortcutsTool-282750d6.css             [39m[1m[2m  3.29 kB[22m[1m[22m[2m 鈹?gzip:   0.97 kB[22m
+[2m../../dist/[22m[35massets/DpiAdjusterTool-e1e0c815.css           [39m[1m[2m  3.84 kB[22m[1m[22m[2m 鈹?gzip:   1.10 kB[22m
+[2m../../dist/[22m[35massets/index-24addc16.css                     [39m[1m[2m  5.93 kB[22m[1m[22m[2m 鈹?gzip:   1.46 kB[22m
+[2m../../dist/[22m[35massets/BitrateTool-5f70465e.css               [39m[1m[2m  6.43 kB[22m[1m[22m[2m 鈹?gzip:   1.53 kB[22m
+[2m../../dist/[22m[35massets/dialog-ca844bec.css                    [39m[1m[2m  9.29 kB[22m[1m[22m[2m 鈹?gzip:   1.02 kB[22m
+[2m../../dist/[22m[35massets/index-fd08d6cf.css                     [39m[1m[2m  9.46 kB[22m[1m[22m[2m 鈹?gzip:   1.82 kB[22m
+[2m../../dist/[22m[35massets/index-070b68b9.css                     [39m[1m[2m 10.15 kB[22m[1m[22m[2m 鈹?gzip:   1.28 kB[22m
+[2m../../dist/[22m[35massets/index-f415a644.css                     [39m[1m[2m 14.92 kB[22m[1m[22m[2m 鈹?gzip:   2.73 kB[22m
+[2m../../dist/[22m[35massets/index-5cdefb55.css                     [39m[1m[2m 34.42 kB[22m[1m[22m[2m 鈹?gzip:   5.38 kB[22m
+[2m../../dist/[22m[35massets/sunshine-frame-196cc831.css            [39m[1m[2m 51.86 kB[22m[1m[22m[2m 鈹?gzip:   8.60 kB[22m
+[2m../../dist/[22m[35massets/index-5b05c8ff.css                     [39m[1m[2m352.45 kB[22m[1m[22m[2m 鈹?gzip:  47.24 kB[22m
+[2m../../dist/[22m[36massets/_commonjsHelpers-725317a4.js           [39m[1m[2m  0.24 kB[22m[1m[22m[2m 鈹?gzip:   0.18 kB[22m
+[2m../../dist/[22m[36massets/webworkerAll-6f316f30.js               [39m[1m[2m  0.34 kB[22m[1m[22m[2m 鈹?gzip:   0.21 kB[22m
+[2m../../dist/[22m[36massets/modulepreload-polyfill-3cfb730f.js     [39m[1m[2m  0.71 kB[22m[1m[22m[2m 鈹?gzip:   0.40 kB[22m
+[2m../../dist/[22m[36massets/CanvasPool-1b300ce9.js                 [39m[1m[2m  0.78 kB[22m[1m[22m[2m 鈹?gzip:   0.44 kB[22m
+[2m../../dist/[22m[36massets/preload-helper-cf010ec4.js             [39m[1m[2m  0.88 kB[22m[1m[22m[2m 鈹?gzip:   0.55 kB[22m
+[2m../../dist/[22m[36massets/placeholder-0193db8e.js                [39m[1m[2m  0.93 kB[22m[1m[22m[2m 鈹?gzip:   0.68 kB[22m
+[2m../../dist/[22m[36massets/index-49837daf.js                      [39m[1m[2m  0.98 kB[22m[1m[22m[2m 鈹?gzip:   0.54 kB[22m
+[2m../../dist/[22m[36massets/event-37228c89.js                      [39m[1m[2m  1.34 kB[22m[1m[22m[2m 鈹?gzip:   0.66 kB[22m
+[2m../../dist/[22m[36massets/about-f6225d86.js                      [39m[1m[2m  1.44 kB[22m[1m[22m[2m 鈹?gzip:   0.86 kB[22m
+[2m../../dist/[22m[36massets/tauri-polyfill-833d1f83.js             [39m[1m[2m  1.92 kB[22m[1m[22m[2m 鈹?gzip:   1.04 kB[22m
+[2m../../dist/[22m[36massets/toolWindow-de9c4b09.js                 [39m[1m[2m  2.04 kB[22m[1m[22m[2m 鈹?gzip:   1.01 kB[22m
+[2m../../dist/[22m[36massets/DpiAdjusterTool-74a3411d.js            [39m[1m[2m  2.10 kB[22m[1m[22m[2m 鈹?gzip:   1.24 kB[22m
+[2m../../dist/[22m[36massets/Filter-911c0fa2.js                     [39m[1m[2m  2.48 kB[22m[1m[22m[2m 鈹?gzip:   0.96 kB[22m
+[2m../../dist/[22m[36massets/tauri-adapter-81f1c1fe.js              [39m[1m[2m  2.72 kB[22m[1m[22m[2m 鈹?gzip:   1.02 kB[22m
+[2m../../dist/[22m[36massets/core-7c2ac0d6.js                       [39m[1m[2m  2.73 kB[22m[1m[22m[2m 鈹?gzip:   1.07 kB[22m
+[2m../../dist/[22m[36massets/webviewWindow-ef7e6d6a.js              [39m[1m[2m  4.87 kB[22m[1m[22m[2m 鈹?gzip:   1.45 kB[22m
+[2m../../dist/[22m[36massets/BitrateTool-ba794a97.js                [39m[1m[2m  5.42 kB[22m[1m[22m[2m 鈹?gzip:   2.73 kB[22m
+[2m../../dist/[22m[36massets/vdd-484f7ea8.js                        [39m[1m[2m  6.56 kB[22m[1m[22m[2m 鈹?gzip:   2.87 kB[22m
+[2m../../dist/[22m[36massets/console-d59975a1.js                    [39m[1m[2m  7.30 kB[22m[1m[22m[2m 鈹?gzip:   2.98 kB[22m
+[2m../../dist/[22m[36massets/BufferResource-91e34ec8.js             [39m[1m[2m 10.68 kB[22m[1m[22m[2m 鈹?gzip:   2.82 kB[22m
+[2m../../dist/[22m[36massets/home-30c5c53b.js                       [39m[1m[2m 11.17 kB[22m[1m[22m[2m 鈹?gzip:   4.53 kB[22m
+[2m../../dist/[22m[36massets/init-7d8d088b.js                       [39m[1m[2m 12.03 kB[22m[1m[22m[2m 鈹?gzip:   3.99 kB[22m
+[2m../../dist/[22m[36massets/window-ba8a6ee3.js                     [39m[1m[2m 14.03 kB[22m[1m[22m[2m 鈹?gzip:   3.54 kB[22m
+[2m../../dist/[22m[36massets/CanvasRenderer-1a49851d.js             [39m[1m[2m 33.58 kB[22m[1m[22m[2m 鈹?gzip:   9.77 kB[22m
+[2m../../dist/[22m[36massets/BitmapFont-0fa856a8.js                 [39m[1m[2m 34.28 kB[22m[1m[22m[2m 鈹?gzip:  11.78 kB[22m
+[2m../../dist/[22m[36massets/WebGPURenderer-da676527.js             [39m[1m[2m 38.74 kB[22m[1m[22m[2m 鈹?gzip:  10.90 kB[22m
+[2m../../dist/[22m[36massets/desktop-91f1ee28.js                    [39m[1m[2m 40.10 kB[22m[1m[22m[2m 鈹?gzip:  11.66 kB[22m
+[2m../../dist/[22m[36massets/browserAll-b930b690.js                 [39m[1m[2m 41.86 kB[22m[1m[22m[2m 鈹?gzip:  11.09 kB[22m
+[2m../../dist/[22m[36massets/RenderTargetSystem-e4a6b3cc.js         [39m[1m[2m 46.68 kB[22m[1m[22m[2m 鈹?gzip:  12.93 kB[22m
+[2m../../dist/[22m[36massets/WebGLRenderer-9f985fee.js              [39m[1m[2m 68.96 kB[22m[1m[22m[2m 鈹?gzip:  18.98 kB[22m
+[2m../../dist/[22m[36massets/sunshineFrame-5e69af14.js              [39m[1m[2m 70.81 kB[22m[1m[22m[2m 鈹?gzip:  24.47 kB[22m
+[2m../../dist/[22m[36massets/_plugin-vue_export-helper-518d76da.js  [39m[1m[2m 82.28 kB[22m[1m[22m[2m 鈹?gzip:  32.57 kB[22m
+[2m../../dist/[22m[36massets/ShortcutsTool-2a28a8c0.js              [39m[1m[2m 94.57 kB[22m[1m[22m[2m 鈹?gzip:  48.17 kB[22m
+[2m../../dist/[22m[36massets/toolbar-88346f4f.js                    [39m[1m[2m252.86 kB[22m[1m[22m[2m 鈹?gzip:  81.51 kB[22m
+[2m../../dist/[22m[36massets/index-ef98b209.js                      [39m[1m[33m919.21 kB[39m[22m[2m 鈹?gzip: 296.50 kB[22m
+
+(!) Some chunks are larger than 500 kBs after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+[32m鉁?built in 8.32s[39m

@@ -22,6 +22,7 @@ export function useSidebarState() {
     const body = document.querySelector('body')
     if (body) {
       body.setAttribute('data-bs-theme', isDark.value ? 'dark' : 'light')
+      body.classList.add('vnite-theme')
     }
 
     // 保存主题偏好
@@ -98,6 +99,7 @@ export function useSidebarState() {
         body?.setAttribute('data-bs-theme', prefersDark ? 'dark' : 'light')
       }
     }
+    body?.classList.add('vnite-theme')
 
     // 检测窗口是否已经最大化
     try {

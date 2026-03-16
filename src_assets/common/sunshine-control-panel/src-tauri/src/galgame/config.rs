@@ -6,6 +6,7 @@ use thiserror::Error;
 
 use super::cloud::CloudSettings;
 use super::game::Game;
+use super::collection::CollectionStore;
 
 #[derive(Error, Debug)]
 #[allow(dead_code)]
@@ -45,6 +46,10 @@ pub struct GalgameConfig {
     /// 通用设置
     #[serde(default)]
     pub settings: GalgameSettings,
+
+    /// 收藏夹
+    #[serde(default)]
+    pub collections: CollectionStore,
 }
 
 /// 通用设置
@@ -69,6 +74,30 @@ pub struct GalgameSettings {
     /// 退出时最小化到托盘
     #[serde(default = "default_true")]
     pub exit_to_tray: bool,
+    
+    /// 启用 NSFW 封面模糊
+    #[serde(default = "default_true")]
+    pub nsfw_blur: bool,
+
+    /// NSFW 封面模糊强度
+    #[serde(default = "default_blur_intensity")]
+    pub nsfw_blur_intensity: u32,
+
+    /// 界面主题 (light/dark)
+    #[serde(default = "default_theme")]
+    pub theme: String,
+
+    /// HTTP 代理地址
+    #[serde(default)]
+    pub http_proxy: String,
+}
+
+fn default_theme() -> String {
+    "dark".to_string()
+}
+
+fn default_blur_intensity() -> u32 {
+    20
 }
 
 fn default_true() -> bool {
@@ -88,6 +117,7 @@ impl Default for GalgameConfig {
             device_id: get_device_id(),
             device_name: get_device_name(),
             settings: GalgameSettings::default(),
+            collections: CollectionStore::default(),
         }
     }
 }
