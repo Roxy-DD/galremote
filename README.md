@@ -18,13 +18,21 @@
 
 它不仅继承了 Sunshine 基地版在 HDR、虚拟显示器管理等方面的所有优势，更内置了强大的 **Galgame 管理中心** 和全新的现代化 **Control Panel**，为您提供从游戏管理、存档云同步到远程串流的一站式解决方案。
 
+<div align="center">
+  <img src="docs/images/library_dark.png" width="800" alt="GalRemote Library View">
+</div>
+
 ## 🌟 核心亮点
 
 ### 🎮 Galgame 管理中心 (Built-in Manager)
 专为视觉小说和 Galgame 设计的本地库管理功能，告别杂乱的文件夹。
 - **自动刮削**: 集成 VNDB (Visual Novel Database) API，自动获取游戏封面、开发商、发售日期和简介信息。
-- **智能游玩统计**: 精确记录每次游玩的起止时间和时长，支持跨设备合并统计数据。
+- **游玩记录仪表盘 (v1.1.0 NEW)**: 全新的统计视图，以图表形式展示总时长、游戏分布及最近活动历史。
 - **一键启动**: 直接从面板启动游戏，自动接管串流会话。
+
+<div align="center">
+  <img src="docs/images/play_records.png" width="800" alt="Play Records Dashboard">
+</div>
 
 ### ☁️ 这个杀手不太冷 (Ultimate Cloud Sync)
 也许是目前最强大的 Galgame 存档同步方案。
@@ -48,6 +56,10 @@
 - **虚拟显示器管理 (VDD)**: 可视化管理虚拟显示器，支持动态分辨率和刷新率调整。
 - **本地代理服务器**: 内置 Axum 代理，彻底解决 WebUI 的跨域和安全策略问题。
 - **个性化定制**: 支持拖拽更换背景图，深色/浅色主题自动同步。
+
+<div align="center">
+  <img src="docs/images/settings_dark.png" width="800" alt="Modern Settings Panel">
+</div>
 
 ## 🚀 推荐客户端配置
 

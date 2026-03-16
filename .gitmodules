@@ -74,3 +74,7 @@
 	path = src_assets/common/sunshine-control-panel
 	url = https://github.com/Roxy-DD/galremote-control-panel.git
 	branch = main
+[submodule "src_assets/common/vnite"]
+	path = src_assets/common/vnite
+	url = https://github.com/ximu3/vnite
+	branch = main
