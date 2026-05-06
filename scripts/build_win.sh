@@ -19,7 +19,14 @@ ninja --version || echo "NINJA FAILED"
 cargo --version || echo "CARGO FAILED"
 
 echo "=== Patching Submodules for GCC Compatibility ==="
-sed -i 's/extern __success(return == NVAPI_OK) NvAPI_Status/extern NvAPI_Status/g' third-party/nvapi-open-source-sdk/nvapi_lite_salstart.h
+# Remove __success SAL annotation that GCC doesn't understand
+sed -i 's/extern __success(return == NVAPI_OK) NvAPI_status/extern NvAPI_status/g' third-party/nvapi-open-source-sdk/nvapi_lite_salstart.h
+
+# Strip all remaining SAL annotations (__in, __out, __inout, etc.)
+# These are Windows-specific SAL (Source Code Annotation Language) annotations
+sed -i 's/__in\b//g' third-party/nvapi-open-source-sdk/nvapi.h
+sed -i 's/__out\b//g' third-party/nvapi-open-source-sdk/nvapi.h
+sed -i 's/__inout\b//g' third-party/nvapi-open-source-sdk/nvapi.h
 
 echo "=== Starting Build ==="
 mkdir -p build
