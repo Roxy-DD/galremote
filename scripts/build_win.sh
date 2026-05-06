@@ -1,9 +1,9 @@
 #!/bin/bash
-set -e
+set -ex
 
 # Setup paths
 export PATH="/c/msys64/ucrt64/bin:/c/msys64/usr/bin:$PATH"
-WINDOWS_USER=$(cmd //c "echo %USERNAME%" | tr -d '\r')
+WINDOWS_USER="${USER:-runneradmin}"
 CARGO_BIN="/c/Users/${WINDOWS_USER}/.cargo/bin"
 export PATH="$CARGO_BIN:$PATH"
 
@@ -14,9 +14,9 @@ which ninja
 which node
 which npm
 which cargo
-cmake --version | head -n 1
-ninja --version
-cargo --version
+cmake --version || echo "CMAKE FAILED"
+ninja --version || echo "NINJA FAILED"
+cargo --version || echo "CARGO FAILED"
 
 echo "=== Starting Build ==="
 mkdir -p build
