@@ -1,10 +1,10 @@
-use log::{Level, Log, Metadata, Record};
-use std::sync::{Arc, Mutex};
-use tauri::{AppHandle, Manager, Emitter};
-use serde::{Deserialize, Serialize};
 use chrono::Local;
+use log::{Level, Log, Metadata, Record};
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
+use tauri::{AppHandle, Emitter, Manager};
 
 /// 日志条目结构
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -40,12 +40,13 @@ impl LogCollector {
     pub fn add_log(&self, record: &Record) {
         // 提取文件名（只保留文件名，不包含路径）
         let file = record.file().map(|f| {
-            f.split('/').last()
+            f.split('/')
+                .last()
                 .or_else(|| f.split('\\').last())
                 .unwrap_or(f)
                 .to_string()
         });
-        
+
         let entry = LogEntry {
             timestamp: Local::now().format("%Y-%m-%d %H:%M:%S%.3f").to_string(),
             level: match record.level() {
@@ -65,7 +66,7 @@ impl LogCollector {
         {
             let mut logs = self.logs.lock().unwrap();
             logs.push(entry.clone());
-            
+
             // 限制日志数量
             if logs.len() > self.max_logs {
                 logs.remove(0);
@@ -99,14 +100,19 @@ pub struct TauriLogger {
 
 impl TauriLogger {
     pub fn new(collector: Arc<LogCollector>) -> Self {
-        let default_log_level = if cfg!(debug_assertions) { "debug" } else { "info" };
+        let default_log_level = if cfg!(debug_assertions) {
+            "debug"
+        } else {
+            "info"
+        };
         let log_level = std::env::var("RUST_LOG").unwrap_or_else(|_| default_log_level.to_string());
-        
-        let mut builder = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or(&log_level));
+
+        let mut builder =
+            env_logger::Builder::from_env(env_logger::Env::default().default_filter_or(&log_level));
         builder.format_timestamp_secs();
         builder.format_module_path(false);
         builder.format_target(false);
-        
+
         Self {
             collector,
             inner: builder.build(),
@@ -130,17 +136,18 @@ impl Log for TauriLogger {
     }
 }
 
-static LOG_COLLECTOR: once_cell::sync::OnceCell<Arc<LogCollector>> = once_cell::sync::OnceCell::new();
+static LOG_COLLECTOR: once_cell::sync::OnceCell<Arc<LogCollector>> =
+    once_cell::sync::OnceCell::new();
 
 /// 初始化日志系统
 pub fn init_logger(app: AppHandle) {
     let collector = Arc::new(LogCollector::new(10000)); // 最多保存 10000 条日志
     collector.set_app_handle(app);
-    
+
     LOG_COLLECTOR.set(collector.clone()).ok();
-    
+
     let logger = Box::new(TauriLogger::new(collector));
-    
+
     log::set_logger(Box::leak(logger))
         .map(|()| log::set_max_level(log::LevelFilter::Trace))
         .expect("无法初始化日志系统");
@@ -172,24 +179,24 @@ pub async fn export_logs(
 ) -> Result<String, String> {
     use tauri_plugin_dialog::DialogExt;
     use tokio::sync::oneshot;
-    
+
     let logs = if let Some(collector) = LOG_COLLECTOR.get() {
         collector.get_logs()
     } else {
         return Err("日志收集器未初始化".to_string());
     };
-    
+
     if logs.is_empty() {
         return Err("没有日志可导出".to_string());
     }
-    
+
     // 生成文件名
     let timestamp = Local::now().format("%Y%m%d_%H%M%S").to_string();
     let default_filename = format!("sunshine_gui_logs_{}.{}", timestamp, format);
-    
+
     // 使用 oneshot channel 来接收对话框结果
     let (tx, rx) = oneshot::channel();
-    
+
     // 打开保存文件对话框
     app.dialog()
         .file()
@@ -200,28 +207,31 @@ pub async fn export_logs(
         .save_file(move |file_path_opt| {
             let _ = tx.send(file_path_opt);
         });
-    
+
     // 等待用户选择文件
-    let file_path = rx.await
+    let file_path = rx
+        .await
         .map_err(|_| "无法接收对话框结果".to_string())?
         .ok_or_else(|| "用户取消了保存".to_string())?;
-    
+
     // 将 FilePath 转换为 PathBuf
     let file_path: PathBuf = PathBuf::from(file_path.to_string());
-    
+
     // 根据格式生成内容
     let content = match format.as_str() {
         "json" => {
-            serde_json::to_string_pretty(&logs)
-                .map_err(|e| format!("序列化JSON失败: {}", e))?
+            serde_json::to_string_pretty(&logs).map_err(|e| format!("序列化JSON失败: {}", e))?
         }
         "txt" | _ => {
             let mut text = String::new();
             text.push_str(&format!("Sunshine Control Panel 日志导出\n"));
-            text.push_str(&format!("导出时间: {}\n", Local::now().format("%Y-%m-%d %H:%M:%S")));
+            text.push_str(&format!(
+                "导出时间: {}\n",
+                Local::now().format("%Y-%m-%d %H:%M:%S")
+            ));
             text.push_str(&format!("日志总数: {}\n", logs.len()));
             text.push_str(&format!("{}\n\n", "=".repeat(80)));
-            
+
             for log in &logs {
                 let file_info = if let (Some(file), Some(line)) = (log.file.as_ref(), log.line) {
                     format!("{}:{}", file, line)
@@ -230,7 +240,7 @@ pub async fn export_logs(
                 } else {
                     "unknown".to_string()
                 };
-                
+
                 text.push_str(&format!(
                     "[{}] [{}] [{}] {}\n",
                     log.timestamp,
@@ -242,16 +252,15 @@ pub async fn export_logs(
             text
         }
     };
-    
+
     // 写入文件
-    fs::write(&file_path, content)
-        .map_err(|e| format!("写入文件失败: {}", e))?;
-    
-    let file_name = file_path.file_name()
+    fs::write(&file_path, content).map_err(|e| format!("写入文件失败: {}", e))?;
+
+    let file_name = file_path
+        .file_name()
         .and_then(|n| n.to_str())
         .unwrap_or("未知文件")
         .to_string();
-    
+
     Ok(format!("日志已导出到: {}", file_name))
 }
-

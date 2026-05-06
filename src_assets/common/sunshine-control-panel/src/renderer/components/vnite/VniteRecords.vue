@@ -48,11 +48,15 @@
                 <div class="play-details">
                   <span class="date">{{ formatDate(record.startTime) }}</span>
                   <span class="dot">·</span>
-                  <span class="duration">时长: {{ formatMinutes(record.duration) }}</span>
+                  <span class="duration" :class="{ 'is-running': record.isRunning }">
+                    {{ record.isRunning ? '正在运行: ' : '时长: ' }}{{ formatMinutes(record.duration) }}
+                  </span>
                 </div>
               </div>
-              <div class="device-tag">
-                <el-icon><Upload /></el-icon> {{ record.deviceId }}
+              <div class="device-tag" :class="{ 'is-running': record.isRunning }">
+                <el-icon v-if="!record.isRunning"><Upload /></el-icon>
+                <el-icon v-else class="running-icon"><VideoPlay /></el-icon>
+                {{ record.isRunning ? '当前设备' : record.deviceId }}
               </div>
             </div>
           </div>
@@ -77,26 +81,48 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import VniteImage from './VniteImage.vue'
 import {
-  Timer, Monitor, Calendar, List, Upload, PieChart
+  Timer, Monitor, Calendar, List, Upload, PieChart, VideoPlay
 } from '@element-plus/icons-vue'
 
 const props = defineProps({
   games: {
     type: Array,
-    default: () => []
+    required: true
   }
 })
 
+// Ticker to force re-computation of real-time durations
+const ticker = ref(0)
+let timer = null
+
+onMounted(() => {
+  timer = setInterval(() => {
+    ticker.value++
+  }, 1000)
+})
+
+onUnmounted(() => {
+  if (timer) clearInterval(timer)
+})
+
 const stats = computed(() => {
+  // Access ticker to trigger re-computation
+  const _ = ticker.value 
   let totalTime = 0
   let lastPlayedTime = 0
   let lastPlayedName = ''
 
   props.games.forEach(game => {
-    totalTime += (game.total_play_time || 0)
+    let gameTime = (game.total_play_time || 0)
+    // Include current session if running
+    if (game.is_running && game.current_session_start) {
+      gameTime += (Math.floor(Date.now() / 1000) - game.current_session_start)
+    }
+    
+    totalTime += gameTime
     if (game.last_played && game.last_played > lastPlayedTime) {
       lastPlayedTime = game.last_played
       lastPlayedName = game.name
@@ -113,6 +139,7 @@ const stats = computed(() => {
 const recentHistory = computed(() => {
   const history = []
   props.games.forEach(game => {
+    // 1. Completed sessions
     if (game.play_history) {
       game.play_history.forEach(session => {
         history.push({
@@ -120,15 +147,27 @@ const recentHistory = computed(() => {
           cover: game.cover_image,
           startTime: session.start_time,
           duration: session.duration_seconds,
-          deviceId: session.device_id
+          deviceId: session.device_id,
+          isRunning: false
         })
+      })
+    }
+    // 2. Currently running session
+    if (game.is_running && game.current_session_start) {
+      history.push({
+        gameName: game.name,
+        cover: game.cover_image,
+        startTime: game.current_session_start,
+        duration: Math.floor(Date.now() / 1000) - game.current_session_start,
+        deviceId: '本机',
+        isRunning: true
       })
     }
   })
 
   return history
     .sort((a, b) => b.startTime - a.startTime)
-    .slice(0, 10)
+    .slice(0, 15)
 })
 
 const statusDistribution = computed(() => {
@@ -140,11 +179,18 @@ const statusDistribution = computed(() => {
   }
   
   props.games.forEach(game => {
+    // If actually running, count as Playing regardless of manual status
+    if (game.is_running) {
+      dist['Playing']++
+      return
+    }
+    
     const status = game.status || 'NotStarted'
     if (dist[status] !== undefined) {
       dist[status]++
     } else {
-      dist[status] = (dist[status] || 0) + 1
+      // For other statuses like 'Partial', 'Multiple'
+      dist['Playing'] = (dist['Playing'] || 0) + 1
     }
   })
   
@@ -153,20 +199,35 @@ const statusDistribution = computed(() => {
 
 // Helpers
 function formatTotalTime(seconds) {
+  if (seconds < 60) return `${seconds} 秒`
   const hours = Math.floor(seconds / 3600)
-  if (hours > 0) return `${hours} 小时`
-  const minutes = Math.floor(seconds / 60)
+  const minutes = Math.floor((seconds % 3600) / 60)
+  
+  if (hours > 0) {
+    return `${hours} 小时 ${minutes} 分`
+  }
   return `${minutes} 分钟`
 }
 
 function formatMinutes(seconds) {
-  const m = Math.ceil(seconds / 60)
-  return `${m} 分钟`
+  if (seconds < 60) return `${seconds} 秒`
+  const m = Math.floor(seconds / 60)
+  const s = seconds % 60
+  if (m > 0 && s > 0) return `${m}分 ${s}秒`
+  if (m > 0) return `${m} 分钟`
+  return `${s} 秒`
 }
 
 function formatDate(timestamp) {
   if (!timestamp) return ''
   const date = new Date(timestamp * 1000)
+  const now = new Date()
+  
+  const isToday = date.toDateString() === now.toDateString()
+  if (isToday) {
+    return `今天 ${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`
+  }
+  
   return `${date.getMonth() + 1}月${date.getDate()}日 ${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`
 }
 

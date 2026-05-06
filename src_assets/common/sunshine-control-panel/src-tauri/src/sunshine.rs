@@ -1,10 +1,10 @@
+use log::{debug, error, info, warn};
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::process::Command;
-use url::Url;
-use log::{info, warn, error, debug};
-use once_cell::sync::Lazy;
 use std::sync::Mutex;
+use url::Url;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SunshineConfig {
@@ -25,34 +25,34 @@ fn get_sunshine_path() -> PathBuf {
             return cached_path.clone();
         }
     }
-    
+
     // 缓存未命中，查找路径
     let path = get_sunshine_path_internal();
-    
+
     // 更新缓存
     {
         let mut cache = SUNSHINE_PATH_CACHE.lock().unwrap();
         *cache = Some(path.clone());
     }
-    
+
     path
 }
 
 fn get_sunshine_path_internal() -> PathBuf {
     #[cfg(target_os = "windows")]
     {
-        use winreg::enums::*;
         use winreg::RegKey;
-        
+        use winreg::enums::*;
+
         let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
-        
+
         // 尝试多个可能的注册表位置
         let registry_paths = [
             r"SOFTWARE\LizardByte\Sunshine",
             r"SOFTWARE\WOW6432Node\LizardByte\Sunshine",
             r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Sunshine",
         ];
-        
+
         for reg_path in &registry_paths {
             if let Ok(sunshine_key) = hklm.open_subkey(reg_path) {
                 // 尝试读取多个可能的键名
@@ -67,20 +67,20 @@ fn get_sunshine_path_internal() -> PathBuf {
                 }
             }
         }
-        
+
         // 尝试默认安装路径
         let default_paths = [
             PathBuf::from(r"C:\Program Files\Sunshine"),
             PathBuf::from(r"C:\Program Files (x86)\Sunshine"),
         ];
-        
+
         for path in &default_paths {
             if path.exists() {
                 info!("✅ 使用默认 Sunshine 路径: {:?}", path);
                 return path.clone();
             }
         }
-        
+
         warn!("⚠️  无法找到 Sunshine 安装路径，使用默认路径");
         PathBuf::from(r"C:\Program Files\Sunshine")
     }
@@ -94,15 +94,13 @@ fn get_sunshine_path_internal() -> PathBuf {
 /// 获取 Sunshine 安装路径（暴露给前端）
 #[tauri::command]
 pub fn get_sunshine_install_path() -> String {
-    get_sunshine_path()
-        .to_string_lossy()
-        .to_string()
+    get_sunshine_path().to_string_lossy().to_string()
 }
 
 #[tauri::command]
 pub async fn get_sunshine_version() -> Result<String, String> {
     let sunshine_exe = get_sunshine_path().join("sunshine.exe");
-    
+
     if !sunshine_exe.exists() {
         return Ok("Unknown".to_string());
     }
@@ -122,21 +120,21 @@ pub async fn get_sunshine_version() -> Result<String, String> {
         .arg("--version")
         .output()
         .map_err(|e| e.to_string())?;
-    
+
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
     let combined = format!("{}{}", stdout, stderr);
-    
+
     // 按优先级匹配版本号模式
     let patterns = [
-        r"v?(\d+\.\d+\.\d+\.杂鱼)",           // 完整版本号（含"杂鱼"）
-        r"(\d+\.\d+\.\d+\.杂鱼)",             // 不带 v 前缀
-        r"Sunshine\s+v?([\d.]+(?:\.杂鱼)?)",  // "Sunshine v..." 格式
+        r"v?(\d+\.\d+\.\d+\.杂鱼)",              // 完整版本号（含"杂鱼"）
+        r"(\d+\.\d+\.\d+\.杂鱼)",                // 不带 v 前缀
+        r"Sunshine\s+v?([\d.]+(?:\.杂鱼)?)",     // "Sunshine v..." 格式
         r"version\s*:?\s*v?([\d.]+(?:\.杂鱼)?)", // "version: ..." 格式
-        r"v?(\d+\.\d+\.\d+(?:\.杂鱼)?)",      // 标准版本号
-        r"(\d+\.\d+(?:\.杂鱼)?)",             // 简化版本号
+        r"v?(\d+\.\d+\.\d+(?:\.杂鱼)?)",         // 标准版本号
+        r"(\d+\.\d+(?:\.杂鱼)?)",                // 简化版本号
     ];
-    
+
     for pattern_str in &patterns {
         if let Ok(pattern) = regex::Regex::new(pattern_str) {
             if let Some(cap) = pattern.captures(&combined) {
@@ -148,14 +146,14 @@ pub async fn get_sunshine_version() -> Result<String, String> {
             }
         }
     }
-    
+
     Ok("Unknown".to_string())
 }
 
 #[tauri::command]
 pub async fn parse_sunshine_config() -> Result<SunshineConfig, String> {
     let config_path = get_sunshine_path().join("config").join("sunshine.conf");
-    
+
     if !config_path.exists() {
         return Ok(SunshineConfig {
             port: Some("47989".to_string()),
@@ -164,27 +162,26 @@ pub async fn parse_sunshine_config() -> Result<SunshineConfig, String> {
             fps: None,
         });
     }
-    
-    let content = std::fs::read_to_string(config_path)
-        .map_err(|e| e.to_string())?;
-    
+
+    let content = std::fs::read_to_string(config_path).map_err(|e| e.to_string())?;
+
     let mut config = SunshineConfig {
         port: None,
         adapter_name: None,
         resolutions: None,
         fps: None,
     };
-    
+
     for line in content.lines() {
         let line = line.trim();
         if line.starts_with('#') || line.is_empty() {
             continue;
         }
-        
+
         if let Some((key, value)) = line.split_once('=') {
             let key = key.trim();
             let value = value.trim();
-            
+
             match key {
                 "port" => config.port = Some(value.to_string()),
                 "adapter_name" => config.adapter_name = Some(value.to_string()),
@@ -194,7 +191,7 @@ pub async fn parse_sunshine_config() -> Result<SunshineConfig, String> {
             }
         }
     }
-    
+
     Ok(config)
 }
 
@@ -204,17 +201,18 @@ pub async fn get_sunshine_url() -> Result<String, String> {
     if let Some(url) = get_command_line_url() {
         return Ok(url);
     }
-    
+
     // 从配置文件读取端口
     let config = parse_sunshine_config().await?;
-    
-    let port = config.port
+
+    let port = config
+        .port
         .and_then(|p| p.parse::<u16>().ok())
         .unwrap_or(47989);
-    
+
     // Sunshine Web UI 端口 = 配置端口 + 1
     let web_port = port + 1;
-    
+
     // 使用 127.0.0.1 避免 IPv6 解析问题
     Ok(format!("https://127.0.0.1:{}", web_port))
 }
@@ -235,7 +233,7 @@ pub struct SessionInfo {
     pub width: u32,
     pub height: u32,
     pub fps: u32,
-    pub bitrate: u32,  // Current bitrate in Kbps
+    pub bitrate: u32, // Current bitrate in Kbps
     pub host_audio: bool,
     pub enable_hdr: bool,
     pub enable_mic: bool,
@@ -273,10 +271,7 @@ impl SessionInfo {
                 .get("height")
                 .and_then(|v| v.as_u64())
                 .unwrap_or(0) as u32,
-            fps: session_obj
-                .get("fps")
-                .and_then(|v| v.as_u64())
-                .unwrap_or(0) as u32,
+            fps: session_obj.get("fps").and_then(|v| v.as_u64()).unwrap_or(0) as u32,
             bitrate: session_obj
                 .get("bitrate")
                 .and_then(|v| v.as_u64())
@@ -317,62 +312,75 @@ fn create_https_client() -> Result<reqwest::Client, String> {
 #[tauri::command]
 pub async fn get_active_sessions() -> Result<Vec<SessionInfo>, String> {
     let sunshine_url = get_sunshine_url().await?;
-    let sessions_url = format!("{}/api/runtime/sessions", sunshine_url.trim_end_matches('/'));
-    
+    let sessions_url = format!(
+        "{}/api/runtime/sessions",
+        sunshine_url.trim_end_matches('/')
+    );
+
     debug!("📡 获取活动会话: {}", sessions_url);
-    
+
     let client = create_https_client()?;
-    
+
     let response = client
         .get(&sessions_url)
         .send()
         .await
         .map_err(|e| format!("请求会话信息失败: {}", e))?;
-    
+
     let status = response.status();
 
     debug!("📡 获取 sessions 响应状态码: {}", status);
-    
+
     // 检查 Content-Type
-    let content_type = response.headers()
+    let content_type = response
+        .headers()
         .get("content-type")
         .and_then(|h| h.to_str().ok())
         .unwrap_or("")
         .to_lowercase();
-    
-    let response_text = response.text().await
+
+    let response_text = response
+        .text()
+        .await
         .map_err(|e| format!("读取响应失败: {}", e))?;
 
     debug!("📡 获取 sessions 响应内容: {}", response_text);
-    
+
     // 如果是 404 或 XML 响应，返回空数组（没有会话是正常情况）
-    if status == 404 || content_type.contains("xml") || response_text.trim_start().starts_with("<?xml") {
+    if status == 404
+        || content_type.contains("xml")
+        || response_text.trim_start().starts_with("<?xml")
+    {
         debug!("⚠️ 没有活动会话 (404 或 XML 响应)");
         return Ok(Vec::new());
     }
-    
+
     // 如果状态码不是成功，但也不是 404，返回错误
     if !status.is_success() {
         error!("❌ 错误响应: {}", response_text);
-        return Err(format!("获取会话信息失败 (状态: {}): {}", status, response_text));
+        return Err(format!(
+            "获取会话信息失败 (状态: {}): {}",
+            status, response_text
+        ));
     }
-    
+
     // 尝试解析 JSON
     let json: serde_json::Value = serde_json::from_str(&response_text)
         .map_err(|e| format!("解析 JSON 失败: {}，响应内容: {}", e, response_text))?;
-    
+
     debug!("📡 解析后的 JSON: {:#}", json);
-    
+
     // 检查 API 响应状态
     if let Some(success) = json.get("success").and_then(|v| v.as_bool()) {
         if !success {
-            let error_msg = json.get("status_message")
+            let error_msg = json
+                .get("status_message")
                 .and_then(|v| v.as_str())
                 .unwrap_or("未知错误");
             return Err(format!("API 返回错误: {}", error_msg));
         }
     }
-    
+
     // 解析会话列表
     let sessions = json
         .get("sessions")
@@ -389,34 +397,35 @@ pub async fn get_active_sessions() -> Result<Vec<SessionInfo>, String> {
             debug!("📡 JSON 结构: {:#}", json);
             Vec::new()
         });
-    
+
     info!("✅ 获取到 {} 个活动会话", sessions.len());
     Ok(sessions)
 }
 
 #[tauri::command]
 pub async fn change_bitrate(client_name: String, bitrate: u32) -> Result<String, String> {
-    
     // 验证码率范围
     if !(1..=800000).contains(&bitrate) {
         return Err("码率值必须在 1-800000 Kbps 之间".to_string());
     }
-    
+
     // 构建请求 URL
     let sunshine_url = get_sunshine_url().await?;
-    let base_url = Url::parse(&sunshine_url)
-        .map_err(|e| format!("解析 Sunshine URL 失败: {}", e))?;
-    
-    let mut change_bitrate_url = base_url.join("api/runtime/bitrate")
+    let base_url =
+        Url::parse(&sunshine_url).map_err(|e| format!("解析 Sunshine URL 失败: {}", e))?;
+
+    let mut change_bitrate_url = base_url
+        .join("api/runtime/bitrate")
         .map_err(|e| format!("构建 URL 失败: {}", e))?;
-    
-    change_bitrate_url.query_pairs_mut()
+
+    change_bitrate_url
+        .query_pairs_mut()
         .append_pair("bitrate", &bitrate.to_string())
         .append_pair("clientname", &client_name);
-    
+
     info!("📡 调整码率: {} -> {} Kbps", client_name, bitrate);
     debug!("📡 请求 URL: {}", change_bitrate_url);
-    
+
     // 发送请求
     let client = create_https_client()?;
     let response = client
@@ -424,16 +433,16 @@ pub async fn change_bitrate(client_name: String, bitrate: u32) -> Result<String,
         .send()
         .await
         .map_err(|e| format!("请求调整码率失败: {}", e))?;
-    
+
     let status = response.status();
     debug!("📡 HTTP 状态码: {}", status);
-    
+
     // 读取响应内容
     let response_text = response
         .text()
         .await
         .map_err(|e| format!("读取响应失败: {}", e))?;
-    
+
     // 检查 HTTP 状态码
     if !status.is_success() {
         return Err(match status.as_u16() {
@@ -441,14 +450,14 @@ pub async fn change_bitrate(client_name: String, bitrate: u32) -> Result<String,
             403 => "访问被拒绝，仅允许 localhost 访问".to_string(),
             _ => format!("HTTP 错误 (状态码: {}): {}", status, response_text),
         });
-        }
-    
+    }
+
     // 解析 JSON 响应
     let json: serde_json::Value = serde_json::from_str(&response_text)
         .map_err(|e| format!("解析 JSON 失败: {}，响应内容: {}", e, response_text))?;
-    
+
     debug!("📡 解析后的 JSON: {:#}", json);
-    
+
     // 检查响应状态
     match json.get("success").and_then(|v| v.as_bool()) {
         Some(true) => {
@@ -456,22 +465,27 @@ pub async fn change_bitrate(client_name: String, bitrate: u32) -> Result<String,
             Ok(format!("码率已调整为 {} Kbps", bitrate))
         }
         Some(false) => {
-            let error_msg = json.get("status_message")
+            let error_msg = json
+                .get("status_message")
                 .and_then(|v| v.as_str())
                 .unwrap_or("未知错误");
-            let status_code = json.get("status_code")
+            let status_code = json
+                .get("status_code")
                 .and_then(|v| v.as_u64())
                 .unwrap_or(0);
-            
+
             error!("❌ 码率调整失败: {} (状态码: {})", error_msg, status_code);
-            
+
             // 根据状态码提供详细提示
             let error_message = if status_code == 404 {
-                format!("码率调整失败: {}\n\n提示：请确认客户端名称是否正确，或会话是否处于 RUNNING 状态", error_msg)
+                format!(
+                    "码率调整失败: {}\n\n提示：请确认客户端名称是否正确，或会话是否处于 RUNNING 状态",
+                    error_msg
+                )
             } else {
                 format!("码率调整失败: {}", error_msg)
             };
-            
+
             Err(error_message)
         }
         None => {

@@ -8,5 +8,5 @@ pub mod commands;
 pub mod config;
 pub mod game;
 pub mod scanner;
-
 pub mod scraper;
+pub mod session;

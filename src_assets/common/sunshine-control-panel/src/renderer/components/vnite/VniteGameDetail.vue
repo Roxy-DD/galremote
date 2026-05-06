@@ -41,13 +41,22 @@ const emit = defineEmits([
 
 const activeTab = ref('overview')
 const isRunning = ref(false)
+const isClosing = ref(false)
 
 const hasExePath = computed(() => !!props.game.exe_path)
 
 let unlistenRunning = null
+let unlistenClosing = null
 let unlistenStopped = null
 
+const ticker = ref(0)
+let timer = null
+
 onMounted(async () => {
+  timer = setInterval(() => {
+    ticker.value++
+  }, 1000)
+
   // Check if current game is already running
   try {
     const runningGame = await invoke('galgame_get_running_game')
@@ -58,23 +67,32 @@ onMounted(async () => {
     console.error('Failed to check running status:', e)
   }
 
-  // Listen for global events
   unlistenRunning = await listen('galgame-game-running', (event) => {
     if (event.payload === props.game.name) {
       isRunning.value = true
+      isClosing.value = false
+    }
+  })
+
+  unlistenClosing = await listen('galgame-game-closing', (event) => {
+    if (event.payload === props.game.name) {
+      isClosing.value = true
     }
   })
 
   unlistenStopped = await listen('galgame-game-stopped', (event) => {
     if (event.payload === props.game.name) {
       isRunning.value = false
+      isClosing.value = false
     }
   })
 })
 
 onUnmounted(() => {
   if (unlistenRunning) unlistenRunning()
+  if (unlistenClosing) unlistenClosing()
   if (unlistenStopped) unlistenStopped()
+  if (timer) clearInterval(timer)
 })
 
 async function handleKillGame() {
@@ -105,9 +123,11 @@ const resolveBannerUrl = async (path) => {
   }
 }
 
-watch(() => props.game?.background_image || props.game?.cover_image, (newPath) => {
-  if (newPath) resolveBannerUrl(newPath)
-}, { immediate: true })
+watch(() => props.game, (newGame) => {
+  if (newGame) {
+    resolveBannerUrl(newGame.background_image || newGame.cover_image)
+  }
+}, { immediate: true, deep: true })
 
 function getGameStatusType(status) {
   const map = {
@@ -134,12 +154,26 @@ function getGameStatusLabel(status) {
 }
 
 function formatPlayTime(seconds) {
-  if (!seconds) return '0小时'
+  if (seconds === undefined || seconds === null) return '0秒'
+  if (seconds < 60) return `${seconds}秒`
   const h = Math.floor(seconds / 3600)
   const m = Math.floor((seconds % 3600) / 60)
+  const s = seconds % 60
+  
   if (h > 0) return `${h}小时${m}分`
+  if (s > 0) return `${m}分${s}秒`
   return `${m}分钟`
 }
+
+const displayPlayTime = computed(() => {
+  // Access ticker to trigger re-computation
+  const _ = ticker.value
+  let total = props.game.total_play_time || 0
+  if (isRunning.value && props.game.current_session_start) {
+    total += (Math.floor(Date.now() / 1000) - props.game.current_session_start)
+  }
+  return formatPlayTime(total)
+})
 
 function formatLastPlayed(timestamp) {
   if (!timestamp) return ''
@@ -204,6 +238,7 @@ async function handleToggleCollection(col) {
           <div class="game-cover-box">
             <VniteImage 
               :src="game.cover_image"
+              :refreshKey="game.vndb_id || game.steam_id || game.name"
               radius="12px"
               class="cover-image-main"
               :style="{
@@ -291,19 +326,20 @@ async function handleToggleCollection(col) {
               </el-button>
               <el-button 
                 v-else
-                type="danger" 
+                :type="isClosing ? 'warning' : 'danger'" 
                 size="large" 
                 class="launch-btn running" 
                 @click="handleKillGame"
+                :loading="isClosing"
               >
                 <el-icon :size="20"><CircleClose /></el-icon>
-                <span>正在运行 (强制结束)</span>
+                <span>{{ isClosing ? '正在归档数据...' : '正在运行 (强制结束)' }}</span>
               </el-button>
               
               <div class="quick-stats">
                 <div class="stat-box">
                   <span class="label">游玩时间</span>
-                  <span class="value">{{ formatPlayTime(game.total_play_time) }}</span>
+                  <span class="value">{{ displayPlayTime }}</span>
                 </div>
                 <div class="stat-box">
                   <span class="label">最后运行</span>

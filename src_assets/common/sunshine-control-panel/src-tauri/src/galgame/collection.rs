@@ -96,21 +96,21 @@ mod tests {
     #[test]
     fn test_collection_crud() {
         let mut store = CollectionStore::default();
-        
+
         let col = GameCollection::new("col-1".to_string(), "我的收藏".to_string());
         store.add_collection(col);
         assert_eq!(store.collections.len(), 1);
-        
+
         assert!(store.add_game_to_collection("col-1", "Amairo Chocolate"));
         assert!(!store.add_game_to_collection("col-1", "Amairo Chocolate")); // duplicate
-        
+
         let col = store.get_collection("col-1").unwrap();
         assert_eq!(col.games.len(), 1);
         assert_eq!(col.games[0], "Amairo Chocolate");
-        
+
         assert!(store.remove_game_from_collection("col-1", "Amairo Chocolate"));
         assert!(!store.remove_game_from_collection("col-1", "Nonexistent"));
-        
+
         assert!(store.remove_collection("col-1"));
         assert_eq!(store.collections.len(), 0);
     }

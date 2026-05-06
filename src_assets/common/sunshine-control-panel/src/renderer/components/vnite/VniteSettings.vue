@@ -18,10 +18,12 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 const props = defineProps({
   modelValue: Boolean,
   settings: Object,
-  cloudSettings: Object
+  cloudSettings: Object,
+  syncingTo: Boolean,
+  syncingFrom: Boolean
 })
 
-const emit = defineEmits(['update:modelValue', 'saved', 'sync-from-cloud', 'prune-config'])
+const emit = defineEmits(['update:modelValue', 'saved', 'sync-from-cloud', 'sync-to-cloud', 'prune-config'])
 
 const activeTab = ref('general')
 const localSettings = ref({ ...props.settings })
@@ -165,6 +167,19 @@ const saveSettings = async () => {
 
 const handlePrune = () => {
   emit('prune-config')
+}
+
+const handleSyncToCloud = async () => {
+  try {
+    await ElMessageBox.confirm('确定要将本地所有配置与存档元数据上传到云端吗？这可能会覆盖云端的较旧数据。', '确认推送', {
+      confirmButtonText: '确定推送',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+    emit('sync-to-cloud')
+  } catch (e) {
+    // Cancelled
+  }
 }
 
 const handleClose = () => {
@@ -350,7 +365,8 @@ const handleClose = () => {
                 
                 <div class="cloud-actions" style="margin-top: 20px;">
                   <el-button @click="handleTestConnection" :loading="testingCloud" type="primary">测试连接</el-button>
-                  <el-button @click="emit('sync-from-cloud')" type="success">从云拉取全部</el-button>
+                  <el-button @click="handleSyncToCloud" :loading="syncingTo" type="warning" plain>推送全部到云端</el-button>
+                  <el-button @click="emit('sync-from-cloud')" :loading="syncingFrom" type="success">从云拉取全部</el-button>
                 </div>
               </template>
             </el-form>
@@ -364,7 +380,7 @@ const handleClose = () => {
           </template>
           <div class="settings-pane about-pane">
             <h2>Sunshine Control Panel</h2>
-            <p class="version">Version 1.1.0</p>
+            <p class="version">Version 1.1.1</p>
             <el-divider />
             <p>基于 Tauri 2.0 与 Rust 构建的 Galgame 聚合管理平台。</p>
             <div class="links">

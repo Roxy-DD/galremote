@@ -1,14 +1,14 @@
-use tauri::{
-    menu::{Menu, MenuItem, PredefinedMenuItem, CheckMenuItem},
-    tray::{TrayIconBuilder, MouseButton, TrayIconEvent},
-    Manager, AppHandle, Runtime, Emitter
-};
-use std::time::Duration;
-use std::sync::Mutex;
-use log::{info, warn, error, debug};
-use crate::utils;
 use crate::toolbar;
+use crate::utils;
 use crate::windows;
+use log::{debug, error, info, warn};
+use std::sync::Mutex;
+use std::time::Duration;
+use tauri::{
+    AppHandle, Emitter, Manager, Runtime,
+    menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem},
+    tray::{MouseButton, TrayIconBuilder, TrayIconEvent},
+};
 
 // 防止睡眠状态管理
 static PREVENT_SLEEP_STATE: Mutex<bool> = Mutex::new(false);
@@ -16,47 +16,66 @@ static PREVENT_SLEEP_STATE: Mutex<bool> = Mutex::new(false);
 /// 创建系统托盘
 pub fn create_system_tray<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
     // 创建菜单项
-    let vdd_settings = MenuItem::with_id(app, "vdd_settings", "📱 设置虚拟显示器（VDD）", true, None::<&str>)?;
+    let vdd_settings = MenuItem::with_id(
+        app,
+        "vdd_settings",
+        "📱 设置虚拟显示器（VDD）",
+        true,
+        None::<&str>,
+    )?;
     let show_toolbar = MenuItem::with_id(app, "show_toolbar", "🐾 显示工具栏", true, None::<&str>)?;
-    let log_console = MenuItem::with_id(app, "log_console", "🔍 打开日志控制台", true, None::<&str>)?;
+    let log_console =
+        MenuItem::with_id(app, "log_console", "🔍 打开日志控制台", true, None::<&str>)?;
     let about = MenuItem::with_id(app, "about", "ℹ️ 关于", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "退出程序", true, None::<&str>)?;
     let _separator1 = PredefinedMenuItem::separator(app)?;
     let separator2 = PredefinedMenuItem::separator(app)?;
     let separator3 = PredefinedMenuItem::separator(app)?;
-    
+
     #[cfg(target_os = "windows")]
-    let prevent_sleep = CheckMenuItem::with_id(app, "prevent_sleep", "💤 不许睡", true, false, None::<&str>)?;
-    
+    let prevent_sleep =
+        CheckMenuItem::with_id(app, "prevent_sleep", "💤 不许睡", true, false, None::<&str>)?;
+
     #[cfg(debug_assertions)]
-    let open_desktop = MenuItem::with_id(app, "open_desktop", "🖥️ 打开桌面 UI", true, None::<&str>)?;
+    let open_desktop =
+        MenuItem::with_id(app, "open_desktop", "🖥️ 打开桌面 UI", true, None::<&str>)?;
     #[cfg(debug_assertions)]
     let debug_page = MenuItem::with_id(app, "debug_page", "🐛 打开调试页面", true, None::<&str>)?;
     #[cfg(debug_assertions)]
     let separator_debug = PredefinedMenuItem::separator(app)?;
-    
+
     // 构建菜单
-    let mut items: Vec<&dyn tauri::menu::IsMenuItem<R>> = vec![
-        &vdd_settings, &show_toolbar,
-    ];
-    
+    let mut items: Vec<&dyn tauri::menu::IsMenuItem<R>> = vec![&vdd_settings, &show_toolbar];
+
     #[cfg(target_os = "windows")]
     items.push(&prevent_sleep);
-    
+
     items.push(&log_console);
 
     #[cfg(debug_assertions)]
-    items.extend([&separator_debug as &dyn tauri::menu::IsMenuItem<R>, &debug_page]);
+    items.extend([
+        &separator_debug as &dyn tauri::menu::IsMenuItem<R>,
+        &debug_page,
+    ]);
 
     #[cfg(debug_assertions)]
     items.push(&open_desktop);
-    
-    items.extend([&separator2 as &dyn tauri::menu::IsMenuItem<R>, &about, &separator3, &quit]);
-    
+
+    items.extend([
+        &separator2 as &dyn tauri::menu::IsMenuItem<R>,
+        &about,
+        &separator3,
+        &quit,
+    ]);
+
     let menu = Menu::with_items(app, &items)?;
     let is_admin = utils::is_running_as_admin().unwrap_or(false);
-    let tooltip = if is_admin { "Sunshine GUI (管理员)" } else { "Sunshine GUI" };
-    
+    let tooltip = if is_admin {
+        "Sunshine GUI (管理员)"
+    } else {
+        "Sunshine GUI"
+    };
+
     TrayIconBuilder::new()
         .menu(&menu)
         .icon(app.default_window_icon().unwrap().clone())
@@ -64,12 +83,18 @@ pub fn create_system_tray<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| handle_tray_menu_event(app, event.id().as_ref()))
         .on_tray_icon_event(|tray, event| match event {
-            TrayIconEvent::Click { button: MouseButton::Left, .. } => handle_tray_click(tray.app_handle()),
-            TrayIconEvent::DoubleClick { button: MouseButton::Left, .. } => handle_tray_double_click(tray.app_handle()),
+            TrayIconEvent::Click {
+                button: MouseButton::Left,
+                ..
+            } => handle_tray_click(tray.app_handle()),
+            TrayIconEvent::DoubleClick {
+                button: MouseButton::Left,
+                ..
+            } => handle_tray_double_click(tray.app_handle()),
             _ => {}
         })
         .build(app)?;
-    
+
     Ok(())
 }
 
@@ -78,14 +103,17 @@ pub fn handle_tray_click<R: Runtime>(app: &AppHandle<R>) {
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
         tokio::time::sleep(Duration::from_millis(200)).await;
-        
+
         if let Some(window) = app.get_webview_window("main") {
             let is_visible = window.is_visible().unwrap_or(false);
             let is_minimized = window.is_minimized().unwrap_or(false);
             let is_focused = window.is_focused().unwrap_or(false);
-            
-            debug!("📊 窗口状态: visible={}, minimized={}, focused={}", is_visible, is_minimized, is_focused);
-            
+
+            debug!(
+                "📊 窗口状态: visible={}, minimized={}, focused={}",
+                is_visible, is_minimized, is_focused
+            );
+
             if is_visible && !is_minimized && is_focused {
                 debug!("🔽 单击：隐藏窗口");
                 let _ = window.hide();
@@ -172,7 +200,7 @@ fn toggle_toolbar<R: Runtime>(app: &AppHandle<R>) {
 fn toggle_prevent_sleep<R: Runtime>(_app: &AppHandle<R>) {
     let mut state = PREVENT_SLEEP_STATE.lock().unwrap();
     let new_state = !*state;
-    
+
     if new_state {
         info!("🌙 托盘菜单：启用防止睡眠");
         match enable_prevent_sleep() {
@@ -205,7 +233,7 @@ fn enable_prevent_sleep() -> Result<(), String> {
     unsafe extern "system" {
         fn SetThreadExecutionState(es_flags: u32) -> u32;
     }
-    
+
     // ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_AWAYMODE_REQUIRED
     // ES_CONTINUOUS: 持续有效直到调用 SetThreadExecutionState(ES_CONTINUOUS) 来清除
     // ES_SYSTEM_REQUIRED: 防止系统进入睡眠状态
@@ -213,16 +241,16 @@ fn enable_prevent_sleep() -> Result<(), String> {
     const ES_CONTINUOUS: u32 = 0x80000000;
     const ES_SYSTEM_REQUIRED: u32 = 0x00000001;
     const ES_AWAYMODE_REQUIRED: u32 = 0x00000040;
-    
+
     let flags = ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_AWAYMODE_REQUIRED;
-    
+
     unsafe {
         let result = SetThreadExecutionState(flags);
         if result == 0 {
             return Err("SetThreadExecutionState 调用失败".to_string());
         }
     }
-    
+
     Ok(())
 }
 
@@ -234,17 +262,17 @@ fn disable_prevent_sleep() -> Result<(), String> {
     unsafe extern "system" {
         fn SetThreadExecutionState(es_flags: u32) -> u32;
     }
-    
+
     // ES_CONTINUOUS: 清除所有执行状态标志
     const ES_CONTINUOUS: u32 = 0x80000000;
-    
+
     unsafe {
         let result = SetThreadExecutionState(ES_CONTINUOUS);
         if result == 0 {
             return Err("SetThreadExecutionState 调用失败".to_string());
         }
     }
-    
+
     Ok(())
 }
 

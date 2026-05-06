@@ -1,17 +1,17 @@
 use axum::{
+    Router,
     extract::Request,
     response::{IntoResponse, Response},
-    Router,
 };
-use tower_http::cors::CorsLayer;
-use std::net::SocketAddr;
-use std::sync::{Arc, RwLock};
+use log::{debug, error, info, warn};
 use once_cell::sync::Lazy;
-use std::sync::atomic::{AtomicBool, AtomicU64, AtomicU16, Ordering};
-use log::{info, warn, error, debug};
+use std::net::SocketAddr;
+use std::sync::atomic::{AtomicBool, AtomicU16, AtomicU64, Ordering};
+use std::sync::{Arc, RwLock};
+use tower_http::cors::CorsLayer;
 
 /// 全局 Sunshine 目标 URL（动态配置）
-static SUNSHINE_TARGET: Lazy<Arc<RwLock<String>>> = 
+static SUNSHINE_TARGET: Lazy<Arc<RwLock<String>>> =
     Lazy::new(|| Arc::new(RwLock::new(String::from("https://localhost:47990"))));
 
 /// 快速失败机制：记录 Sunshine 是否可用
@@ -66,11 +66,11 @@ pub async fn start_proxy_server() -> Result<(), Box<dyn std::error::Error + Send
     let app = Router::new()
         .fallback(proxy_handler)
         .layer(CorsLayer::permissive());
-    
+
     // 尝试在端口范围内找到可用端口
     let mut listener = None;
     let mut bound_port = PROXY_PORT_START;
-    
+
     for port in PROXY_PORT_START..=PROXY_PORT_END {
         let addr = SocketAddr::from(([127, 0, 0, 1], port));
         match tokio::net::TcpListener::bind(addr).await {
@@ -88,20 +88,26 @@ pub async fn start_proxy_server() -> Result<(), Box<dyn std::error::Error + Send
             }
         }
     }
-    
+
     let listener = match listener {
         Some(l) => l,
         None => {
-            error!("❌ 代理服务器绑定端口失败: 端口 {}-{} 均被占用", PROXY_PORT_START, PROXY_PORT_END);
+            error!(
+                "❌ 代理服务器绑定端口失败: 端口 {}-{} 均被占用",
+                PROXY_PORT_START, PROXY_PORT_END
+            );
             return Err(format!("无法绑定端口 {}-{}", PROXY_PORT_START, PROXY_PORT_END).into());
         }
     };
-    
+
     // 保存实际使用的端口
     PROXY_PORT.store(bound_port, Ordering::Relaxed);
-    info!("🚀 Sunshine 代理服务器已启动: http://127.0.0.1:{}", bound_port);
+    info!(
+        "🚀 Sunshine 代理服务器已启动: http://127.0.0.1:{}",
+        bound_port
+    );
     info!("   开始监听请求...");
-    
+
     axum::serve(listener, app).await.map_err(|e| {
         error!("❌ 代理服务器运行失败: {}", e);
         e.into()
@@ -143,11 +149,19 @@ fn mark_available() {
 /// 检查是否是连接错误
 fn is_connection_error(error: &str) -> bool {
     const CONNECTION_ERROR_PATTERNS: &[&str] = &[
-        "connection", "refused", "timed out", "timeout",
-        "unreachable", "error sending request", "network", "dns"
+        "connection",
+        "refused",
+        "timed out",
+        "timeout",
+        "unreachable",
+        "error sending request",
+        "network",
+        "dns",
     ];
     let error_lower = error.to_lowercase();
-    CONNECTION_ERROR_PATTERNS.iter().any(|p| error_lower.contains(p))
+    CONNECTION_ERROR_PATTERNS
+        .iter()
+        .any(|p| error_lower.contains(p))
 }
 
 /// 检查是否是 API 请求
@@ -171,7 +185,7 @@ fn is_steam_api_request(path: &str) -> bool {
 /// 解析外部代理 URL
 fn parse_external_proxy_url(path: &str, query: &str) -> Option<String> {
     use url::form_urlencoded;
-    
+
     // 路径格式: /_proxy/{encoded_url}
     // 或者: /_proxy/?url={encoded_url}
     if let Some(encoded_url) = path.strip_prefix("/_proxy/") {
@@ -180,7 +194,7 @@ fn parse_external_proxy_url(path: &str, query: &str) -> Option<String> {
             return percent_decode_str(encoded_url);
         }
     }
-    
+
     // 检查查询参数
     if !query.is_empty() {
         for (key, value) in form_urlencoded::parse(query.as_bytes()) {
@@ -189,7 +203,7 @@ fn parse_external_proxy_url(path: &str, query: &str) -> Option<String> {
             }
         }
     }
-    
+
     None
 }
 
@@ -200,10 +214,9 @@ fn percent_decode_str(s: &str) -> Option<String> {
     let mut i = 0;
     while i < bytes.len() {
         if bytes[i] == b'%' && i + 2 < bytes.len() {
-            if let Ok(byte) = u8::from_str_radix(
-                std::str::from_utf8(&bytes[i+1..i+3]).unwrap_or(""),
-                16
-            ) {
+            if let Ok(byte) =
+                u8::from_str_radix(std::str::from_utf8(&bytes[i + 1..i + 3]).unwrap_or(""), 16)
+            {
                 result.push(byte);
                 i += 3;
                 continue;
@@ -221,16 +234,21 @@ fn service_unavailable_response(is_api: bool) -> Response {
         // API 请求返回 JSON 格式错误
         (
             axum::http::StatusCode::SERVICE_UNAVAILABLE,
-            [(axum::http::header::CONTENT_TYPE, "application/json; charset=utf-8")],
-            r#"{"success":false,"error":"Sunshine service is unavailable"}"#
-        ).into_response()
+            [(
+                axum::http::header::CONTENT_TYPE,
+                "application/json; charset=utf-8",
+            )],
+            r#"{"success":false,"error":"Sunshine service is unavailable"}"#,
+        )
+            .into_response()
     } else {
         // 页面请求返回 HTML 错误页面
         (
             axum::http::StatusCode::SERVICE_UNAVAILABLE,
             [(axum::http::header::CONTENT_TYPE, "text/html; charset=utf-8")],
-            ERROR_404_PAGE
-        ).into_response()
+            ERROR_404_PAGE,
+        )
+            .into_response()
     }
 }
 
@@ -241,20 +259,20 @@ async fn proxy_handler(req: Request) -> Response {
     let path = uri.path().to_string();
     let query = uri.query().unwrap_or("").to_string();
     let headers = req.headers().clone();
-    
+
     // 检查是否是外部代理请求（用于绕过 CORS）
     if is_external_proxy_request(&path) {
         return handle_external_proxy(&path, &query, &method, &headers, req).await;
     }
-    
+
     // 检查是否是 Steam API 请求（需要特殊处理）
     if is_steam_api_request(&path) {
         return handle_steam_api(&path, &query, &method, &headers, req).await;
     }
-    
+
     // 判断是否是 API 请求
     let is_api = is_api_request(&path);
-    
+
     // 获取请求体
     let body = match axum::body::to_bytes(req.into_body(), usize::MAX).await {
         Ok(bytes) => bytes.to_vec(),
@@ -263,28 +281,29 @@ async fn proxy_handler(req: Request) -> Response {
             return (axum::http::StatusCode::BAD_REQUEST, "读取请求体失败").into_response();
         }
     };
-    
+
     // 构建目标 URL
-    let sunshine_base = SUNSHINE_TARGET.read()
+    let sunshine_base = SUNSHINE_TARGET
+        .read()
         .map(|url| url.clone())
         .unwrap_or_else(|_| "https://localhost:47990".to_string());
-    
+
     let target_url = if query.is_empty() {
         format!("{}{}", sunshine_base, path)
     } else {
         format!("{}{}?{}", sunshine_base, path, query)
     };
-    
+
     #[cfg(debug_assertions)]
     if path == "/" || path.ends_with(".html") || path.starts_with("/api/") {
         debug!("📡 代理请求: {} {}", method, path);
     }
-    
+
     // 快速失败检查
     if should_fast_fail() {
         return service_unavailable_response(is_api);
     }
-    
+
     // 请求 Sunshine
     match fetch_and_proxy(&target_url, &method, &headers, body).await {
         Ok(response) => {
@@ -294,7 +313,7 @@ async fn proxy_handler(req: Request) -> Response {
         Err(e) => {
             let error_str = e.to_string();
             error!("❌ 代理错误 [{}]: {}", path, error_str);
-            
+
             if is_connection_error(&error_str) {
                 mark_unavailable();
                 service_unavailable_response(is_api)
@@ -302,11 +321,19 @@ async fn proxy_handler(req: Request) -> Response {
                 if is_api {
                     (
                         axum::http::StatusCode::BAD_GATEWAY,
-                        [(axum::http::header::CONTENT_TYPE, "application/json; charset=utf-8")],
-                        format!(r#"{{"success":false,"error":"Proxy error: {}"}}"#, e)
-                    ).into_response()
+                        [(
+                            axum::http::header::CONTENT_TYPE,
+                            "application/json; charset=utf-8",
+                        )],
+                        format!(r#"{{"success":false,"error":"Proxy error: {}"}}"#, e),
+                    )
+                        .into_response()
                 } else {
-                    (axum::http::StatusCode::BAD_GATEWAY, format!("代理错误: {}", e)).into_response()
+                    (
+                        axum::http::StatusCode::BAD_GATEWAY,
+                        format!("代理错误: {}", e),
+                    )
+                        .into_response()
                 }
             }
         }
@@ -329,11 +356,15 @@ async fn handle_steam_api(
             return (axum::http::StatusCode::BAD_REQUEST, "读取请求体失败").into_response();
         }
     };
-    
+
     // 构建目标 URL
     let target_url = if path.starts_with("/steam-store/") {
         let api_path = path.strip_prefix("/steam-store").unwrap_or(path);
-        let params = if query.is_empty() { "l=schinese&cc=CN" } else { query };
+        let params = if query.is_empty() {
+            "l=schinese&cc=CN"
+        } else {
+            query
+        };
         format!("https://store.steampowered.com{}?{}", api_path, params)
     } else if path.starts_with("/steamgriddb/") {
         let api_path = path.strip_prefix("/steamgriddb").unwrap_or(path);
@@ -341,13 +372,17 @@ async fn handle_steam_api(
     } else {
         return (
             axum::http::StatusCode::BAD_REQUEST,
-            [(axum::http::header::CONTENT_TYPE, "application/json; charset=utf-8")],
-            r#"{"success":false,"error":"Unknown Steam API path"}"#
-        ).into_response();
+            [(
+                axum::http::header::CONTENT_TYPE,
+                "application/json; charset=utf-8",
+            )],
+            r#"{"success":false,"error":"Unknown Steam API path"}"#,
+        )
+            .into_response();
     };
-    
+
     debug!("🎮 Steam API 代理请求: {} -> {}", path, target_url);
-    
+
     // 发送请求并构建响应
     let client = get_http_client();
     match send_request(client, &target_url, method, headers, &body).await {
@@ -356,9 +391,16 @@ async fn handle_steam_api(
             error!("❌ Steam API 请求失败: {}", e);
             (
                 axum::http::StatusCode::BAD_GATEWAY,
-                [(axum::http::header::CONTENT_TYPE, "application/json; charset=utf-8")],
-                format!(r#"{{"success":false,"error":"Steam API request failed: {}"}}"#, e)
-            ).into_response()
+                [(
+                    axum::http::header::CONTENT_TYPE,
+                    "application/json; charset=utf-8",
+                )],
+                format!(
+                    r#"{{"success":false,"error":"Steam API request failed: {}"}}"#,
+                    e
+                ),
+            )
+                .into_response()
         }
     }
 }
@@ -367,11 +409,11 @@ async fn handle_steam_api(
 async fn build_cors_response(response: reqwest::Response) -> Response {
     let status = response.status();
     let resp_headers = response.headers().clone();
-    
+
     match response.bytes().await {
         Ok(body_bytes) => {
             let mut builder = axum::http::Response::builder().status(status.as_u16());
-            
+
             // 复制响应头（排除 CORS 和 transfer-encoding）
             for (key, value) in resp_headers.iter() {
                 let key_str = key.as_str().to_lowercase();
@@ -379,24 +421,38 @@ async fn build_cors_response(response: reqwest::Response) -> Response {
                     builder = builder.header(key.as_str(), value);
                 }
             }
-            
+
             // 添加 CORS 头部
             builder
                 .header("Access-Control-Allow-Origin", "*")
-                .header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+                .header(
+                    "Access-Control-Allow-Methods",
+                    "GET, POST, PUT, DELETE, OPTIONS",
+                )
                 .header("Access-Control-Allow-Headers", "*")
                 .body(axum::body::Body::from(body_bytes.to_vec()))
                 .unwrap_or_else(|_| {
-                    (axum::http::StatusCode::INTERNAL_SERVER_ERROR, "构建响应失败").into_response()
+                    (
+                        axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                        "构建响应失败",
+                    )
+                        .into_response()
                 })
         }
         Err(e) => {
             error!("❌ 读取响应失败: {}", e);
             (
                 axum::http::StatusCode::BAD_GATEWAY,
-                [(axum::http::header::CONTENT_TYPE, "application/json; charset=utf-8")],
-                format!(r#"{{"success":false,"error":"Failed to read response: {}"}}"#, e)
-            ).into_response()
+                [(
+                    axum::http::header::CONTENT_TYPE,
+                    "application/json; charset=utf-8",
+                )],
+                format!(
+                    r#"{{"success":false,"error":"Failed to read response: {}"}}"#,
+                    e
+                ),
+            )
+                .into_response()
         }
     }
 }
@@ -415,12 +471,16 @@ async fn handle_external_proxy(
         None => {
             return (
                 axum::http::StatusCode::BAD_REQUEST,
-                [(axum::http::header::CONTENT_TYPE, "application/json; charset=utf-8")],
-                r#"{"success":false,"error":"Missing or invalid URL parameter"}"#
-            ).into_response();
+                [(
+                    axum::http::header::CONTENT_TYPE,
+                    "application/json; charset=utf-8",
+                )],
+                r#"{"success":false,"error":"Missing or invalid URL parameter"}"#,
+            )
+                .into_response();
         }
     };
-    
+
     // 安全检查：只允许 HTTPS 请求到白名单域名
     let allowed_domains = [
         "github.io",
@@ -428,24 +488,32 @@ async fn handle_external_proxy(
         "github.com",
         "api.github.com",
     ];
-    
+
     let is_allowed = url::Url::parse(&target_url)
         .ok()
         .and_then(|u| u.host_str().map(|h| h.to_string()))
-        .map(|host| allowed_domains.iter().any(|d| host == *d || host.ends_with(&format!(".{}", d))))
+        .map(|host| {
+            allowed_domains
+                .iter()
+                .any(|d| host == *d || host.ends_with(&format!(".{}", d)))
+        })
         .unwrap_or(false);
-    
+
     if !is_allowed {
         warn!("⚠️ 外部代理请求被拒绝（域名不在白名单）: {}", target_url);
         return (
             axum::http::StatusCode::FORBIDDEN,
-            [(axum::http::header::CONTENT_TYPE, "application/json; charset=utf-8")],
-            r#"{"success":false,"error":"Domain not allowed"}"#
-        ).into_response();
+            [(
+                axum::http::header::CONTENT_TYPE,
+                "application/json; charset=utf-8",
+            )],
+            r#"{"success":false,"error":"Domain not allowed"}"#,
+        )
+            .into_response();
     }
-    
+
     debug!("🌐 外部代理请求: {}", target_url);
-    
+
     // 获取请求体
     let body = match axum::body::to_bytes(req.into_body(), usize::MAX).await {
         Ok(bytes) => bytes.to_vec(),
@@ -454,47 +522,60 @@ async fn handle_external_proxy(
             return (axum::http::StatusCode::BAD_REQUEST, "读取请求体失败").into_response();
         }
     };
-    
+
     // 发送请求
     let client = get_http_client();
     match send_request(client, &target_url, method, headers, &body).await {
         Ok(response) => {
             let status = response.status();
             let resp_headers = response.headers().clone();
-            
+
             match response.bytes().await {
                 Ok(body) => {
-                    let mut builder = axum::http::Response::builder()
-                        .status(status.as_u16());
-                    
+                    let mut builder = axum::http::Response::builder().status(status.as_u16());
+
                     // 复制响应头（排除 CORS 相关头部，我们会添加自己的）
                     for (key, value) in resp_headers.iter() {
                         let key_str = key.as_str().to_lowercase();
-                        if !key_str.starts_with("access-control-") 
-                            && key_str != "transfer-encoding" 
+                        if !key_str.starts_with("access-control-") && key_str != "transfer-encoding"
                         {
                             builder = builder.header(key.as_str(), value);
                         }
                     }
-                    
+
                     // 添加 CORS 头部
                     builder = builder
                         .header("Access-Control-Allow-Origin", "*")
-                        .header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+                        .header(
+                            "Access-Control-Allow-Methods",
+                            "GET, POST, PUT, DELETE, OPTIONS",
+                        )
                         .header("Access-Control-Allow-Headers", "*");
-                    
-                    builder.body(axum::body::Body::from(body.to_vec()))
+
+                    builder
+                        .body(axum::body::Body::from(body.to_vec()))
                         .unwrap_or_else(|_| {
-                            (axum::http::StatusCode::INTERNAL_SERVER_ERROR, "构建响应失败").into_response()
+                            (
+                                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                                "构建响应失败",
+                            )
+                                .into_response()
                         })
                 }
                 Err(e) => {
                     error!("❌ 读取外部响应失败: {}", e);
                     (
                         axum::http::StatusCode::BAD_GATEWAY,
-                        [(axum::http::header::CONTENT_TYPE, "application/json; charset=utf-8")],
-                        format!(r#"{{"success":false,"error":"Failed to read response: {}"}}"#, e)
-                    ).into_response()
+                        [(
+                            axum::http::header::CONTENT_TYPE,
+                            "application/json; charset=utf-8",
+                        )],
+                        format!(
+                            r#"{{"success":false,"error":"Failed to read response: {}"}}"#,
+                            e
+                        ),
+                    )
+                        .into_response()
                 }
             }
         }
@@ -502,9 +583,16 @@ async fn handle_external_proxy(
             error!("❌ 外部代理请求失败: {}", e);
             (
                 axum::http::StatusCode::BAD_GATEWAY,
-                [(axum::http::header::CONTENT_TYPE, "application/json; charset=utf-8")],
-                format!(r#"{{"success":false,"error":"External request failed: {}"}}"#, e)
-            ).into_response()
+                [(
+                    axum::http::header::CONTENT_TYPE,
+                    "application/json; charset=utf-8",
+                )],
+                format!(
+                    r#"{{"success":false,"error":"External request failed: {}"}}"#,
+                    e
+                ),
+            )
+                .into_response()
         }
     }
 }
@@ -530,7 +618,7 @@ async fn send_request(
     url: &str,
     method: &axum::http::Method,
     headers: &axum::http::HeaderMap,
-    body: &[u8]
+    body: &[u8],
 ) -> Result<reqwest::Response, reqwest::Error> {
     let mut req_builder = match method.as_str() {
         "GET" => client.get(url),
@@ -541,11 +629,14 @@ async fn send_request(
         "HEAD" => client.head(url),
         _ => client.get(url),
     };
-    
+
     // 复制请求头（排除特殊头部和源相关头部）
     for (key, value) in headers.iter() {
         let key_str = key.as_str();
-        if !matches!(key_str, "host" | "connection" | "content-length" | "transfer-encoding" | "origin" | "referer") {
+        if !matches!(
+            key_str,
+            "host" | "connection" | "content-length" | "transfer-encoding" | "origin" | "referer"
+        ) {
             if let Ok(value_str) = value.to_str() {
                 req_builder = req_builder.header(key_str, value_str);
             }
@@ -558,24 +649,23 @@ async fn send_request(
         req_builder = req_builder.header("Origin", &origin);
         req_builder = req_builder.header("Referer", url);
     }
-    
-    
+
     if !body.is_empty() {
         req_builder = req_builder.body(body.to_vec());
     }
-    
+
     req_builder.send().await
 }
 
 /// 获取并代理内容
 async fn fetch_and_proxy(
-    url: &str, 
+    url: &str,
     method: &axum::http::Method,
     headers: &axum::http::HeaderMap,
-    body: Vec<u8>
+    body: Vec<u8>,
 ) -> Result<Response, Box<dyn std::error::Error + Send + Sync>> {
     let client = get_http_client();
-    
+
     // 尝试请求，HTTPS 失败时降级到 HTTP（仅限非连接错误）
     let response = match send_request(client, url, method, headers, &body).await {
         Ok(resp) => resp,
@@ -586,40 +676,48 @@ async fn fetch_and_proxy(
         }
         Err(e) => return Err(e.into()),
     };
-    
+
     let status = response.status();
     let resp_headers = response.headers().clone();
     let content_type = resp_headers
         .get("content-type")
         .and_then(|v| v.to_str().ok())
         .unwrap_or("text/html");
-    
+
     let body_bytes = response.bytes().await?.to_vec();
-    
+
     // 判断是否需要注入脚本
     let final_body = if should_inject_script(url, content_type) {
         inject_if_needed(body_bytes)
     } else {
         body_bytes
     };
-    
+
     // 构建响应
     let mut res = axum::http::Response::builder().status(status.as_u16());
-    
+
     for (key, value) in resp_headers.iter() {
         let key_str = key.as_str().to_lowercase();
         // 过滤掉可能阻止 iframe 加载的安全头
-        if !matches!(key_str.as_str(), 
-            "content-length" | "transfer-encoding" | "content-encoding" |
-            "x-frame-options" | "content-security-policy" | "content-security-policy-report-only" |
-            "strict-transport-security" | "permissions-policy" |
-            "cross-origin-embedder-policy" | "cross-origin-opener-policy" | "cross-origin-resource-policy" |
-            "x-content-type-options"
+        if !matches!(
+            key_str.as_str(),
+            "content-length"
+                | "transfer-encoding"
+                | "content-encoding"
+                | "x-frame-options"
+                | "content-security-policy"
+                | "content-security-policy-report-only"
+                | "strict-transport-security"
+                | "permissions-policy"
+                | "cross-origin-embedder-policy"
+                | "cross-origin-opener-policy"
+                | "cross-origin-resource-policy"
+                | "x-content-type-options"
         ) {
             res = res.header(key, value);
         }
     }
-    
+
     Ok(res.body(axum::body::Body::from(final_body))?)
 }
 
@@ -628,18 +726,22 @@ fn should_inject_script(url: &str, content_type: &str) -> bool {
     if !content_type.contains("text/html") {
         return false;
     }
-    
+
     let path = url.rsplit('/').next().unwrap_or("");
-    matches!(path, "" | "apps" | "config" | "password" | "pin" | "troubleshooting" | "welcome")
-        || url.ends_with(".html")
+    matches!(
+        path,
+        "" | "apps" | "config" | "password" | "pin" | "troubleshooting" | "welcome"
+    ) || url.ends_with(".html")
         || url.ends_with(".htm")
 }
 
 /// 如果需要则注入脚本
 fn inject_if_needed(body: Vec<u8>) -> Vec<u8> {
     match String::from_utf8(body) {
-        Ok(html) if !html.contains("主题同步脚本已加载") 
-            && (html.contains("<html") || html.contains("<!DOCTYPE")) => {
+        Ok(html)
+            if !html.contains("主题同步脚本已加载")
+                && (html.contains("<html") || html.contains("<!DOCTYPE")) =>
+        {
             inject_theme_script(html).into_bytes()
         }
         Ok(html) => html.into_bytes(),
@@ -652,7 +754,7 @@ fn inject_theme_script(html: String) -> String {
     let Some(pos) = html.find("</head>") else {
         return html;
     };
-    
+
     // 根据编译配置决定是否是生产环境
     let is_production = cfg!(not(debug_assertions));
     let production_flag = if is_production {
@@ -660,10 +762,10 @@ fn inject_theme_script(html: String) -> String {
     } else {
         "window.TAURI_PRODUCTION = false;"
     };
-    
+
     let inject_size = INJECT_STYLES.len() + INJECT_SCRIPT.len() + production_flag.len() + 150;
     let mut result = String::with_capacity(html.len() + inject_size);
-    
+
     result.push_str(&html[..pos]);
     result.push_str("\n<!-- Tauri 样式优化 -->\n<style id=\"tauri-scrollbar-theme\">\n");
     result.push_str(INJECT_STYLES);
@@ -673,6 +775,6 @@ fn inject_theme_script(html: String) -> String {
     result.push_str(INJECT_SCRIPT);
     result.push_str("\n</script>\n");
     result.push_str(&html[pos..]);
-    
+
     result
 }

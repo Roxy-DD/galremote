@@ -49,6 +49,10 @@ const props = defineProps({
   radius: {
     type: String,
     default: '8px'
+  },
+  refreshKey: {
+    type: [Number, String],
+    default: 0
   }
 })
 
@@ -85,7 +89,7 @@ const loadImageUrl = async (path) => {
   }
 }
 
-watch(() => props.src, (newPath) => {
+watch(() => [props.src, props.refreshKey], ([newPath]) => {
   loadImageUrl(newPath)
 }, { immediate: true })
 

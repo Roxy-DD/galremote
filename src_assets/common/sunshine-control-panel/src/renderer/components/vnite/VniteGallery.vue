@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
 import { 
   DocumentAdd, 
   VideoPlay, 
@@ -45,7 +45,7 @@ const emit = defineEmits([
 const recentGames = computed(() => {
   return [...props.games]
     .filter(g => g.last_played)
-    .sort((a, b) => new Date(b.last_played) - new Date(a.last_played))
+    .sort((a, b) => (b.last_played || 0) - (a.last_played || 0))
     .slice(0, 4)
 })
 
@@ -67,7 +67,8 @@ const resolveCoverUrl = async (game) => {
 
 watch(() => props.games, (newGames) => {
   newGames.forEach(game => {
-    if (!coverUrls.value[game.name]) {
+    // Force re-resolution when games list updates to ensure fresh data
+    if (game.cover_image) {
       resolveCoverUrl(game)
     }
   })
@@ -77,12 +78,39 @@ const getCoverUrl = (game) => {
   return coverUrls.value[game.name] || ''
 }
 
-const formatPlayTime = (ms) => {
-  if (!ms) return '0 分钟'
-  const minutes = Math.floor(ms / 60000)
-  if (minutes < 60) return `${minutes} 分钟`
-  const hours = (minutes / 60).toFixed(1)
-  return `${hours} 小时`
+const ticker = ref(0)
+let timer = null
+
+onMounted(() => {
+  timer = setInterval(() => {
+    ticker.value++
+  }, 1000)
+})
+
+onUnmounted(() => {
+  if (timer) clearInterval(timer)
+})
+
+const getGamePlayTime = (game) => {
+  // Access ticker to trigger re-computation
+  const _ = ticker.value
+  let total = game.total_play_time || 0
+  if (game.is_running && game.current_session_start) {
+    total += (Math.floor(Date.now() / 1000) - game.current_session_start)
+  }
+  return total
+}
+
+const formatPlayTime = (seconds) => {
+  if (seconds === undefined || seconds === null || seconds === 0) return '0秒'
+  if (seconds < 60) return `${seconds}秒`
+  const hours = Math.floor(seconds / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+  const s = seconds % 60
+
+  if (hours > 0) return `${hours}小时${minutes}分`
+  if (s > 0) return `${minutes}分${s}秒`
+  return `${minutes}分钟`
 }
 
 const getGameStatusLabel = (status) => {
@@ -153,6 +181,7 @@ const handleToggleCollection = async (game, collection) => {
               <div class="card-cover">
                 <VniteImage 
                   :src="game.cover_image"
+                  :refreshKey="game.vndb_id || game.steam_id || game.name"
                   :style="{ 
                     filter: (game.nsfw && settings.nsfw_blur) ? `blur(${settings.nsfw_blur_intensity}px)` : 'none'
                   }"
@@ -162,7 +191,7 @@ const handleToggleCollection = async (game, collection) => {
                 <div class="recent-info">
                   <div class="recent-name">{{ game.name }}</div>
                   <div class="recent-meta">
-                    ⏱ {{ formatPlayTime(game.total_play_time) }}
+                    ⏱ {{ formatPlayTime(getGamePlayTime(game)) }}
                   </div>
                 </div>
               </div>
@@ -181,14 +210,16 @@ const handleToggleCollection = async (game, collection) => {
               :class="{ selected: selectedGame?.name === game.name }"
               @click="emit('select-game', game)"
             >
-              <div
-                class="game-cover"
-                :style="{ 
-                  backgroundImage: game.cover_image ? `url(${getCoverUrl(game)})` : '',
-                  filter: (game.nsfw && settings.nsfw_blur) ? `blur(${settings.nsfw_blur_intensity}px)` : 'none'
-                }"
-              >
-                <div v-if="!game.cover_image" class="cover-placeholder">
+              <div class="game-cover">
+                <VniteImage 
+                  v-if="game.cover_image"
+                  :src="game.cover_image"
+                  :refreshKey="game.vndb_id || game.steam_id || game.name"
+                  :style="{ 
+                    filter: (game.nsfw && settings.nsfw_blur) ? `blur(${settings.nsfw_blur_intensity}px)` : 'none'
+                  }"
+                />
+                <div v-else class="cover-placeholder">
                   <el-icon :size="24"><Picture /></el-icon>
                 </div>
                 <div 

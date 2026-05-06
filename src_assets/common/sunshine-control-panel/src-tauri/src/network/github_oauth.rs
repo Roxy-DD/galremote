@@ -1,7 +1,6 @@
-use serde::{Deserialize, Serialize};
 use reqwest::Client;
+use serde::{Deserialize, Serialize};
 use std::time::Duration;
-
 
 const GITHUB_CLIENT_ID: &str = "Ov23liw1VYcNjvCjvAo2";
 
@@ -39,16 +38,18 @@ fn create_client(proxy: Option<&str>) -> Result<Client, String> {
     let mut builder = Client::builder()
         .timeout(Duration::from_secs(60))
         .user_agent("GalRemote-App");
-    
+
     if let Some(p) = proxy {
         if !p.trim().is_empty() {
-            let reqwest_proxy = reqwest::Proxy::all(p)
-                .map_err(|e| format!("Invalid proxy format: {}", e))?;
+            let reqwest_proxy =
+                reqwest::Proxy::all(p).map_err(|e| format!("Invalid proxy format: {}", e))?;
             builder = builder.proxy(reqwest_proxy);
         }
     }
-    
-    builder.build().map_err(|e| format!("Failed to build client: {}", e))
+
+    builder
+        .build()
+        .map_err(|e| format!("Failed to build client: {}", e))
 }
 
 pub async fn request_device_code(proxy: Option<&str>) -> Result<DeviceCodeResponse, String> {
@@ -73,11 +74,16 @@ pub async fn request_device_code(proxy: Option<&str>) -> Result<DeviceCodeRespon
     Ok(code_resp)
 }
 
-pub async fn poll_for_access_token(device_code: String, interval: u64, expires_in: u64, proxy: Option<&str>) -> Result<String, String> {
+pub async fn poll_for_access_token(
+    device_code: String,
+    interval: u64,
+    expires_in: u64,
+    proxy: Option<&str>,
+) -> Result<String, String> {
     let client = create_client(proxy).unwrap_or_else(|_| Client::new());
     let start_time = std::time::Instant::now();
     let duration_limit = Duration::from_secs(expires_in);
-    
+
     // Safety cushion
     let mut current_interval = interval;
     if current_interval < 5 {
@@ -107,7 +113,7 @@ pub async fn poll_for_access_token(device_code: String, interval: u64, expires_i
                     if let Ok(success) = serde_json::from_str::<AccessTokenSuccess>(&text) {
                         return Ok(success.access_token);
                     }
-                    
+
                     // Try parsing as error
                     if let Ok(err_resp) = serde_json::from_str::<AccessTokenError>(&text) {
                         if err_resp.error == "authorization_pending" {
@@ -120,7 +126,7 @@ pub async fn poll_for_access_token(device_code: String, interval: u64, expires_i
                             return Err(format!("GitHub error: {}", err_resp.error_description));
                         }
                     }
-                    
+
                     log::warn!("Unknown response format from GitHub: {}", text);
                 }
             }
@@ -137,7 +143,7 @@ pub async fn poll_for_access_token(device_code: String, interval: u64, expires_i
 pub async fn setup_github_repository(token: &str, proxy: Option<&str>) -> Result<String, String> {
     let client = create_client(proxy).unwrap_or_else(|_| Client::new());
     let repo_name = "galremote-cloud-saves";
-    
+
     // 1. Get User Profile to find out owner name
     let user_resp = client
         .get("https://api.github.com/user")
@@ -147,9 +153,12 @@ pub async fn setup_github_repository(token: &str, proxy: Option<&str>) -> Result
         .send()
         .await
         .map_err(|e| format!("Failed to fetch user: {}", e))?;
-        
+
     let user_json: serde_json::Value = user_resp.json().await.map_err(|e| e.to_string())?;
-    let owner = user_json["login"].as_str().ok_or("Could not get username")?.to_string();
+    let owner = user_json["login"]
+        .as_str()
+        .ok_or("Could not get username")?
+        .to_string();
 
     // 2. Check if repo exists
     let repo_url = format!("https://api.github.com/repos/{}/{}", owner, repo_name);
@@ -186,7 +195,10 @@ pub async fn setup_github_repository(token: &str, proxy: Option<&str>) -> Result
         .map_err(|e| format!("Failed to create repo request: {}", e))?;
 
     if !create_resp.status().is_success() {
-        return Err(format!("Failed to create repo, status: {}", create_resp.status()));
+        return Err(format!(
+            "Failed to create repo, status: {}",
+            create_resp.status()
+        ));
     }
 
     Ok(format!("{}/{}", owner, repo_name))

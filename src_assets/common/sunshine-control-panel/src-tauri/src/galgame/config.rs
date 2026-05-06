@@ -5,8 +5,8 @@ use std::path::PathBuf;
 use thiserror::Error;
 
 use super::cloud::CloudSettings;
-use super::game::Game;
 use super::collection::CollectionStore;
+use super::game::Game;
 
 #[derive(Error, Debug)]
 #[allow(dead_code)]
@@ -50,6 +50,14 @@ pub struct GalgameConfig {
     /// 收藏夹
     #[serde(default)]
     pub collections: CollectionStore,
+
+    /// 最后更新时间 (Unix Timestamp)
+    #[serde(default)]
+    pub last_updated: i64,
+
+    /// 最后同步时间 (Unix Timestamp)
+    #[serde(default)]
+    pub last_sync_time: i64,
 }
 
 /// 通用设置
@@ -74,7 +82,7 @@ pub struct GalgameSettings {
     /// 退出时最小化到托盘
     #[serde(default = "default_true")]
     pub exit_to_tray: bool,
-    
+
     /// 启用 NSFW 封面模糊
     #[serde(default = "default_true")]
     pub nsfw_blur: bool,
@@ -111,13 +119,15 @@ fn get_device_id() -> String {
 impl Default for GalgameConfig {
     fn default() -> Self {
         Self {
-            version: "1.0.0".to_string(),
+            version: "1.1.1".to_string(),
             games: Vec::new(),
             cloud_settings: CloudSettings::default(),
             device_id: get_device_id(),
             device_name: get_device_name(),
             settings: GalgameSettings::default(),
             collections: CollectionStore::default(),
+            last_updated: chrono::Utc::now().timestamp(),
+            last_sync_time: 0,
         }
     }
 }
@@ -151,12 +161,15 @@ pub fn load_config() -> ConfigResult<GalgameConfig> {
 
 /// 保存配置
 pub fn save_config(config: &GalgameConfig) -> ConfigResult<()> {
+    let mut config = config.clone();
+    config.last_updated = chrono::Utc::now().timestamp();
+
     let path = get_config_path();
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
 
-    let content = serde_json::to_string_pretty(config)?;
+    let content = serde_json::to_string_pretty(&config)?;
     fs::write(&path, content)?;
     log::info!("Config saved to {:?}", path);
     Ok(())

@@ -1,10 +1,10 @@
-use tauri::{Manager, App, AppHandle};
-use log::{info, error, debug};
-use crate::toolbar;
-use crate::windows;
-use crate::tray;
-use crate::sunshine;
 use crate::proxy_server;
+use crate::sunshine;
+use crate::toolbar;
+use crate::tray;
+use crate::windows;
+use log::{debug, error, info};
+use tauri::{App, AppHandle, Manager};
 
 /// 应用程序状态
 pub struct AppState {
@@ -17,7 +17,7 @@ pub fn setup_application(app: &mut App) -> Result<(), Box<dyn std::error::Error>
     let show_toolbar = std::env::args().any(|arg| arg == "--toolbar" || arg == "-t");
     let show_desktop = std::env::args().any(|arg| arg == "--desktop" || arg == "-d");
     let app_handle = app.handle().clone();
-    
+
     // 根据启动参数选择窗口模式
     if show_desktop {
         info!("🖥️ 检测到 --desktop 参数，启动桌面 UI 模式");
@@ -25,12 +25,17 @@ pub fn setup_application(app: &mut App) -> Result<(), Box<dyn std::error::Error>
     } else {
         windows::create_main_window(&app_handle)?;
     }
-    
+
     tray::create_system_tray(&app_handle)?;
     register_global_shortcuts(app)?;
     setup_menu_event_handler(app);
     start_proxy_server_async();
-    
+
+    // 初始化时尝试恢复未正常结束的游戏时长
+    if let Err(e) = crate::galgame::session::recover_sessions() {
+        error!("❌ 恢复游玩时长失败: {}", e);
+    }
+
     // 延迟任务：工具栏
     tauri::async_runtime::spawn(async move {
         if show_toolbar && !show_desktop {
@@ -41,23 +46,26 @@ pub fn setup_application(app: &mut App) -> Result<(), Box<dyn std::error::Error>
             }
         }
     });
-    
+
     Ok(())
 }
 
 /// 注册全局快捷键
 fn register_global_shortcuts(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
-    
+
     let app_handle = app.handle().clone();
-    
-    app.handle().global_shortcut().on_shortcut("CmdOrCtrl+Shift+Alt+T", move |_app, _shortcut, event| {
-        if event.state == ShortcutState::Pressed {
-            debug!("⌨️ 全局快捷键触发: CTRL+SHIFT+ALT+T");
-            toggle_toolbar_window(&app_handle);
-        }
-    })?;
-    
+
+    app.handle().global_shortcut().on_shortcut(
+        "CmdOrCtrl+Shift+Alt+T",
+        move |_app, _shortcut, event| {
+            if event.state == ShortcutState::Pressed {
+                debug!("⌨️ 全局快捷键触发: CTRL+SHIFT+ALT+T");
+                toggle_toolbar_window(&app_handle);
+            }
+        },
+    )?;
+
     info!("⌨️ 全局快捷键已注册: CTRL+SHIFT+ALT+T");
     Ok(())
 }
@@ -111,7 +119,7 @@ fn start_proxy_server_async() {
                 }
             }
         }
-        
+
         // 启动代理服务器
         if let Err(e) = proxy_server::start_proxy_server().await {
             error!("❌ 代理服务器启动失败: {}", e);
@@ -123,7 +131,7 @@ fn start_proxy_server_async() {
 pub fn handle_single_instance(app: &AppHandle, args: Vec<String>) {
     info!("🔔 检测到第二个实例启动，激活现有窗口");
     debug!("   启动参数: {:?}", args);
-    
+
     // 检查是否要打开桌面 UI
     if args.iter().any(|arg| arg == "--desktop" || arg == "-d") {
         info!("🖥️ 检测到 --desktop 参数，打开桌面 UI");
@@ -132,22 +140,23 @@ pub fn handle_single_instance(app: &AppHandle, args: Vec<String>) {
         }
         return;
     }
-    
+
     // 检查是否要打开工具栏
     if args.iter().any(|arg| arg == "--toolbar" || arg == "-t") {
         info!("🔧 检测到 --toolbar 参数，打开工具栏");
         toggle_toolbar_window(app);
         return;
     }
-    
+
     // 提取 URL 参数并激活主窗口
-    let target_url = args.iter()
+    let target_url = args
+        .iter()
         .find(|arg| arg.starts_with("--url="))
         .map(|arg| arg.trim_start_matches("--url=").to_string());
-    
+
     if let Some(url) = &target_url {
         info!("📍 检测到 URL 参数: {}", url);
     }
-    
+
     windows::activate_main_window(app, target_url);
 }

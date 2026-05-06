@@ -1,6 +1,6 @@
-use tauri::{AppHandle, Manager, Emitter};
-use log::{info, debug};
 use crate::windows;
+use log::{debug, info};
+use tauri::{AppHandle, Emitter, Manager};
 
 /// 注意：菜单现在是气泡样式，直接在工具栏窗口内部渲染，此函数已弃用
 #[tauri::command]
@@ -18,7 +18,7 @@ pub async fn toggle_dark_mode(_window: tauri::Window) -> Result<bool, String> {
 #[tauri::command]
 pub async fn open_tool_window(app: AppHandle, tool_name: String) -> Result<(), String> {
     info!("🔧 打开工具窗口: {}", tool_name);
-    
+
     match tool_name.as_str() {
         "main" => {
             if let Some(window) = app.get_webview_window("main") {
@@ -42,15 +42,19 @@ pub async fn open_tool_window(app: AppHandle, tool_name: String) -> Result<(), S
 #[tauri::command]
 pub async fn fetch_speech_phrases() -> Result<Vec<String>, String> {
     debug!("💬 开始获取话术配置");
-    
-    let url = "https://raw.githubusercontent.com/qiin2333/qiin.github.io/assets/speech-phrases.json";
-    
-    let response = reqwest::get(url).await
+
+    let url =
+        "https://raw.githubusercontent.com/qiin2333/qiin.github.io/assets/speech-phrases.json";
+
+    let response = reqwest::get(url)
+        .await
         .map_err(|e| format!("请求失败: {}", e))?;
-    
-    let phrases: Vec<String> = response.json().await
+
+    let phrases: Vec<String> = response
+        .json()
+        .await
         .map_err(|e| format!("解析失败: {}", e))?;
-    
+
     info!("✅ 话术加载成功，共 {} 条", phrases.len());
     Ok(phrases)
 }

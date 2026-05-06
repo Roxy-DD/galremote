@@ -80,8 +80,11 @@
       v-model="showSettings"
       :settings="galgameSettings"
       :cloud-settings="cloudSettings"
+      :syncingTo="syncing"
+      :syncingFrom="syncingFrom"
       @saved="loadCloudSettings"
       @sync-from-cloud="syncFromCloud"
+      @sync-to-cloud="syncToCloud"
       @prune-config="pruneConfig"
     />
 
@@ -231,10 +234,71 @@ const cloudSettings = ref({
   autoSync: false
 })
 
+let unlistenRunning = null
+let unlistenStopped = null
+let unlistenUpdate = null
+let unlistenAutoSync = null
+let unlistenAutoBackup = null
+
 onMounted(async () => {
   await loadCloudSettings()
   await loadGames()
   await loadCollections()
+
+  // Listen to backend events
+  unlistenRunning = await listen('galgame-game-running', (event) => {
+    const gameName = event.payload
+    const game = games.value.find(g => g.name === gameName)
+    if (game) {
+      game.is_running = true
+      game.current_session_start = Math.floor(Date.now() / 1000)
+    }
+    if (selectedGame.value?.name === gameName) {
+      selectedGame.value.is_running = true
+      selectedGame.value.current_session_start = Math.floor(Date.now() / 1000)
+    }
+  })
+
+  unlistenStopped = await listen('galgame-game-stopped', (event) => {
+    const gameName = event.payload
+    const game = games.value.find(g => g.name === gameName)
+    if (game) {
+      game.is_running = false
+      delete game.current_session_start
+    }
+    if (selectedGame.value?.name === gameName) {
+      selectedGame.value.is_running = false
+      delete selectedGame.value.current_session_start
+    }
+    loadGames() // Refresh stats
+  })
+
+  unlistenUpdate = await listen('galgame-playtime-update', (event) => {
+    const updatedGame = event.payload
+    const idx = games.value.findIndex(g => g.name === updatedGame.name)
+    if (idx !== -1) games.value[idx] = updatedGame
+    if (selectedGame.value?.name === updatedGame.name) {
+      selectedGame.value = updatedGame
+    }
+  })
+
+  unlistenAutoSync = await listen('galgame-auto-sync', (event) => {
+    ElMessage.success(event.payload)
+    loadGames()
+  })
+
+  unlistenAutoBackup = await listen('galgame-auto-backup', (event) => {
+    ElMessage.success(event.payload)
+    loadGames()
+  })
+})
+
+onUnmounted(() => {
+  if (unlistenRunning) unlistenRunning()
+  if (unlistenStopped) unlistenStopped()
+  if (unlistenUpdate) unlistenUpdate()
+  if (unlistenAutoSync) unlistenAutoSync()
+  if (unlistenAutoBackup) unlistenAutoBackup()
 })
 
 const cloudEnabled = computed(() => cloudSettings.value.type !== 'Disabled')
@@ -381,8 +445,36 @@ async function launchGame(game) {
     await invoke('galgame_launch_game', { gameName: game.name })
     ElMessage.success('正在启动...')
   } catch (e) {
-    ElMessage.error('启动失败: ' + e)
+    if (typeof e === 'string' && e.includes('SYNC_CONFLICT')) {
+      conflictGame.value = game
+      showConflictDialog.value = true
+    } else {
+      ElMessage.error('启动失败: ' + e)
+    }
   }
+}
+
+async function resolveConflict(direction) {
+  try {
+    if (direction === 'local') {
+      await invoke('galgame_sync_to_cloud', { force: 'local' })
+    } else {
+      await invoke('galgame_sync_from_cloud', { force: 'cloud' })
+    }
+    showConflictDialog.value = false
+    ElMessage.success('同步冲突已解决，正在尝试启动...')
+    await loadGames()
+    if (conflictGame.value) {
+      launchGame(conflictGame.value)
+    }
+  } catch (e) {
+    ElMessage.error('解决冲突失败: ' + e)
+  }
+}
+
+function closeConflictDialog() {
+  showConflictDialog.value = false
+  conflictGame.value = null
 }
 
 async function deleteCloudBackups() {
@@ -506,14 +598,45 @@ async function syncFromCloud() {
   if (syncingFrom.value) return
   syncingFrom.value = true
   try {
+    console.log('Starting cloud sync (from)...')
     await invoke('galgame_sync_from_cloud')
-    ElMessage.success('云端同步完成')
+    console.log('Cloud sync (from) success')
+    ElMessage({
+      message: '云端同步完成',
+      type: 'success',
+      duration: 5000,
+      showClose: true
+    })
     await loadGames()
     await loadCollections()
   } catch (e) {
+    console.error('Cloud sync (from) failed:', e)
     ElMessage.error('同步失败: ' + e)
   } finally {
     syncingFrom.value = false
+  }
+}
+
+async function syncToCloud() {
+  if (syncing.value) return
+  syncing.value = true
+  try {
+    console.log('Starting cloud push (to local)...')
+    // We pass force: 'local' to ensure we overwrite cloud manifest if there's any ambiguity
+    await invoke('galgame_sync_to_cloud', { force: 'local' })
+    console.log('Cloud push (to local) success')
+    ElMessage({
+      message: '本地数据已成功推送至云端',
+      type: 'success',
+      duration: 5000,
+      showClose: true
+    })
+    await loadGames()
+  } catch (e) {
+    console.error('Cloud push (to local) failed:', e)
+    ElMessage.error('推送失败: ' + e)
+  } finally {
+    syncing.value = false
   }
 }
 

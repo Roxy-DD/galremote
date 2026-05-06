@@ -1,8 +1,8 @@
-use serde::{Deserialize, Serialize};
 use reqwest::Client;
-use std::path::Path;
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::Write;
+use std::path::Path;
 
 // ── 统一搜刮结果 (对齐 Vnite GameMetadata) ──
 
@@ -48,9 +48,17 @@ struct VndbQuery {
     results: u32,
 }
 
-pub async fn search_vndb(query: &str) -> Result<Vec<MetadataResult>, String> {
-    let client = Client::builder()
-        .timeout(std::time::Duration::from_secs(15))
+pub async fn search_vndb(query: &str, proxy: Option<&str>) -> Result<Vec<MetadataResult>, String> {
+    let mut client_builder = Client::builder().timeout(std::time::Duration::from_secs(15));
+
+    if let Some(p) = proxy {
+        if !p.trim().is_empty() {
+            client_builder =
+                client_builder.proxy(reqwest::Proxy::all(p).map_err(|e| e.to_string())?);
+        }
+    }
+
+    let client = client_builder
         .build()
         .map_err(|e| format!("Client build error: {}", e))?;
 
@@ -62,7 +70,8 @@ pub async fn search_vndb(query: &str) -> Result<Vec<MetadataResult>, String> {
         results: 15,
     };
 
-    let resp = client.post("https://api.vndb.org/kana/vn")
+    let resp = client
+        .post("https://api.vndb.org/kana/vn")
         .json(&body)
         .send()
         .await
@@ -75,7 +84,10 @@ pub async fn search_vndb(query: &str) -> Result<Vec<MetadataResult>, String> {
         return Err(format!("VNDB API error: {} - {}", status, error_text));
     }
 
-    let json: serde_json::Value = resp.json().await.map_err(|e| format!("Parse error: {}", e))?;
+    let json: serde_json::Value = resp
+        .json()
+        .await
+        .map_err(|e| format!("Parse error: {}", e))?;
 
     let mut results = Vec::new();
     if let Some(items) = json["results"].as_array() {
@@ -85,32 +97,43 @@ pub async fn search_vndb(query: &str) -> Result<Vec<MetadataResult>, String> {
             let cover_url = item["image"]["url"].as_str().map(|s| s.to_string());
             let description = item["description"].as_str().map(|s| {
                 // Strip VNDB BBCode formatting
-                let re = regex::Regex::new(r"\[/?[a-zA-Z]+\]").unwrap_or_else(|_| regex::Regex::new(r"$^").unwrap());
+                let re = regex::Regex::new(r"\[/?[a-zA-Z]+\]")
+                    .unwrap_or_else(|_| regex::Regex::new(r"$^").unwrap());
                 re.replace_all(s, "").to_string()
             });
             let release_date = item["released"].as_str().map(|s| s.to_string());
 
             // Developers list
-            let developers: Vec<String> = item["developers"].as_array()
-                .map(|arr| arr.iter()
-                    .filter_map(|dev| dev["name"].as_str().map(|s| s.to_string()))
-                    .collect())
+            let developers: Vec<String> = item["developers"]
+                .as_array()
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|dev| dev["name"].as_str().map(|s| s.to_string()))
+                        .collect()
+                })
                 .unwrap_or_default();
 
             let developer = developers.first().cloned();
 
             // Tags (sorted by rating, top 15)
-            let tags: Vec<String> = item["tags"].as_array()
+            let tags: Vec<String> = item["tags"]
+                .as_array()
                 .map(|arr| {
-                    let mut tag_pairs: Vec<(&str, f64)> = arr.iter()
+                    let mut tag_pairs: Vec<(&str, f64)> = arr
+                        .iter()
                         .filter_map(|t| {
                             let name = t["name"].as_str()?;
                             let rating = t["rating"].as_f64().unwrap_or(0.0);
                             Some((name, rating))
                         })
                         .collect();
-                    tag_pairs.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-                    tag_pairs.into_iter().take(15).map(|(name, _)| name.to_string()).collect()
+                    tag_pairs
+                        .sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+                    tag_pairs
+                        .into_iter()
+                        .take(15)
+                        .map(|(name, _)| name.to_string())
+                        .collect()
                 })
                 .unwrap_or_default();
 
@@ -118,12 +141,19 @@ pub async fn search_vndb(query: &str) -> Result<Vec<MetadataResult>, String> {
             let rating = item["rating"].as_f64().map(|r| r as f32);
 
             // Platforms
-            let platforms: Vec<String> = item["platforms"].as_array()
-                .map(|arr| arr.iter().filter_map(|p| p.as_str().map(|s| s.to_string())).collect())
+            let platforms: Vec<String> = item["platforms"]
+                .as_array()
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|p| p.as_str().map(|s| s.to_string()))
+                        .collect()
+                })
                 .unwrap_or_default();
 
             // NSFW check based on tags
-            let nsfw = tags.iter().any(|t| t.to_lowercase().contains("sexual content") || t.to_lowercase().contains("nude"));
+            let nsfw = tags.iter().any(|t| {
+                t.to_lowercase().contains("sexual content") || t.to_lowercase().contains("nude")
+            });
 
             results.push(MetadataResult {
                 id,
@@ -185,9 +215,20 @@ struct BangumiTag {
     name: Option<String>,
 }
 
-pub async fn search_bangumi(query: &str) -> Result<Vec<MetadataResult>, String> {
-    let client = Client::builder()
-        .timeout(std::time::Duration::from_secs(15))
+pub async fn search_bangumi(
+    query: &str,
+    proxy: Option<&str>,
+) -> Result<Vec<MetadataResult>, String> {
+    let mut client_builder = Client::builder().timeout(std::time::Duration::from_secs(15));
+
+    if let Some(p) = proxy {
+        if !p.trim().is_empty() {
+            client_builder =
+                client_builder.proxy(reqwest::Proxy::all(p).map_err(|e| e.to_string())?);
+        }
+    }
+
+    let client = client_builder
         .build()
         .map_err(|e| format!("Client build error: {}", e))?;
 
@@ -200,7 +241,10 @@ pub async fn search_bangumi(query: &str) -> Result<Vec<MetadataResult>, String> 
 
     let resp = client
         .post(endpoint)
-        .header("User-Agent", "sunshine-gui/1.1 (+https://github.com/qiin2333/sunshine)")
+        .header(
+            "User-Agent",
+            "sunshine-gui/1.1 (+https://github.com/qiin2333/sunshine)",
+        )
         .header("Accept", "application/json")
         .json(&body)
         .send()
@@ -220,9 +264,16 @@ pub async fn search_bangumi(query: &str) -> Result<Vec<MetadataResult>, String> 
 
     let mut out = Vec::new();
     for item in parsed.data {
-        let title = item.name_cn.clone().or(item.name.clone()).unwrap_or_else(|| "Unknown".to_string());
+        let title = item
+            .name_cn
+            .clone()
+            .or(item.name.clone())
+            .unwrap_or_else(|| "Unknown".to_string());
         let original = item.name.as_ref().filter(|n| !n.is_empty()).cloned();
-        let cover = item.images.as_ref().and_then(|img| img.large.clone().or(img.common.clone()));
+        let cover = item
+            .images
+            .as_ref()
+            .and_then(|img| img.large.clone().or(img.common.clone()));
         let rating = item.rating.as_ref().and_then(|r| r.score).map(|s| s as f32);
         let tags: Vec<String> = item.tags.iter().filter_map(|t| t.name.clone()).collect();
 
@@ -299,9 +350,20 @@ struct SteamMetacritic {
     score: Option<i32>,
 }
 
-pub async fn search_steam_store(query: &str) -> Result<Vec<MetadataResult>, String> {
-    let client = Client::builder()
-        .timeout(std::time::Duration::from_secs(15))
+pub async fn search_steam_store(
+    query: &str,
+    proxy: Option<&str>,
+) -> Result<Vec<MetadataResult>, String> {
+    let mut client_builder = Client::builder().timeout(std::time::Duration::from_secs(15));
+
+    if let Some(p) = proxy {
+        if !p.trim().is_empty() {
+            client_builder =
+                client_builder.proxy(reqwest::Proxy::all(p).map_err(|e| e.to_string())?);
+        }
+    }
+
+    let client = client_builder
         .build()
         .map_err(|e| format!("Client build error: {}", e))?;
 
@@ -333,20 +395,38 @@ pub async fn search_steam_store(query: &str) -> Result<Vec<MetadataResult>, Stri
         // Try to fetch app details for richer data
         let detail = get_steam_app_detail(&client, app_id).await.ok().flatten();
 
-        let (description, developers, publishers, release_date, genres, rating, cover) = match detail {
-            Some(d) => {
-                let devs = d.developers.unwrap_or_default();
-                let pubs = d.publishers.unwrap_or_default();
-                let rd = d.release_date.and_then(|r| r.date);
-                let g: Vec<String> = d.genres.unwrap_or_default().iter()
-                    .filter_map(|g| g.description.clone())
-                    .collect();
-                let r = d.metacritic.and_then(|m| m.score).map(|s| s as f32);
-                let cover = d.header_image.or(item.tiny_image);
-                (d.short_description, devs, pubs, rd, g, r, cover)
-            }
-            None => (None, Vec::new(), Vec::new(), None, Vec::new(), None, item.tiny_image),
-        };
+        // Prefer 600x900 portrait library image for better gallery view
+        let portrait_cover = format!(
+            "https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/{}/library_600x900.jpg",
+            app_id
+        );
+
+        let (description, developers, publishers, release_date, genres, rating, cover) =
+            match detail {
+                Some(d) => {
+                    let devs = d.developers.unwrap_or_default();
+                    let pubs = d.publishers.unwrap_or_default();
+                    let rd = d.release_date.and_then(|r| r.date);
+                    let g: Vec<String> = d
+                        .genres
+                        .unwrap_or_default()
+                        .iter()
+                        .filter_map(|g| g.description.clone())
+                        .collect();
+                    let r = d.metacritic.and_then(|m| m.score).map(|s| s as f32);
+                    let cover = Some(portrait_cover).or(d.header_image).or(item.tiny_image);
+                    (d.short_description, devs, pubs, rd, g, r, cover)
+                }
+                None => (
+                    None,
+                    Vec::new(),
+                    Vec::new(),
+                    None,
+                    Vec::new(),
+                    None,
+                    Some(portrait_cover).or(item.tiny_image),
+                ),
+            };
 
         out.push(MetadataResult {
             id: format!("steam-{}", app_id),
@@ -370,9 +450,16 @@ pub async fn search_steam_store(query: &str) -> Result<Vec<MetadataResult>, Stri
     Ok(out)
 }
 
-async fn get_steam_app_detail(client: &Client, app_id: u64) -> Result<Option<SteamAppDetail>, String> {
-    let url = format!("https://store.steampowered.com/api/appdetails?appids={}&l=schinese&cc=cn", app_id);
-    let resp = client.get(&url)
+async fn get_steam_app_detail(
+    client: &Client,
+    app_id: u64,
+) -> Result<Option<SteamAppDetail>, String> {
+    let url = format!(
+        "https://store.steampowered.com/api/appdetails?appids={}&l=schinese&cc=cn",
+        app_id
+    );
+    let resp = client
+        .get(&url)
         .send()
         .await
         .map_err(|e| format!("Steam detail error: {}", e))?;
@@ -381,7 +468,10 @@ async fn get_steam_app_detail(client: &Client, app_id: u64) -> Result<Option<Ste
         return Ok(None);
     }
 
-    let json: serde_json::Value = resp.json().await.map_err(|e| format!("Parse error: {}", e))?;
+    let json: serde_json::Value = resp
+        .json()
+        .await
+        .map_err(|e| format!("Parse error: {}", e))?;
     let key = app_id.to_string();
     if let Some(wrapper) = json.get(&key) {
         if let Ok(detail) = serde_json::from_value::<SteamAppDetailWrapper>(wrapper.clone()) {
@@ -460,7 +550,8 @@ async fn ymgal_get_token(client: &Client) -> Result<String, String> {
         ("scope", "public"),
     ];
 
-    let resp = client.get(url)
+    let resp = client
+        .get(url)
         .query(&params)
         .send()
         .await
@@ -470,20 +561,31 @@ async fn ymgal_get_token(client: &Client) -> Result<String, String> {
         return Err(format!("YMGal token HTTP {}", resp.status()));
     }
 
-    let token: YMGalTokenResponse = resp.json().await
+    let token: YMGalTokenResponse = resp
+        .json()
+        .await
         .map_err(|e| format!("YMGal token parse error: {}", e))?;
     Ok(token.access_token)
 }
 
-pub async fn search_ymgal(query: &str) -> Result<Vec<MetadataResult>, String> {
-    let client = Client::builder()
-        .timeout(std::time::Duration::from_secs(15))
+pub async fn search_ymgal(query: &str, proxy: Option<&str>) -> Result<Vec<MetadataResult>, String> {
+    let mut client_builder = Client::builder().timeout(std::time::Duration::from_secs(15));
+
+    if let Some(p) = proxy {
+        if !p.trim().is_empty() {
+            client_builder =
+                client_builder.proxy(reqwest::Proxy::all(p).map_err(|e| e.to_string())?);
+        }
+    }
+
+    let client = client_builder
         .build()
         .map_err(|e| format!("Client build error: {}", e))?;
 
     let token = ymgal_get_token(&client).await?;
 
-    let resp = client.get("https://www.ymgal.games/open/archive/search-game")
+    let resp = client
+        .get("https://www.ymgal.games/open/archive/search-game")
         .header("Authorization", format!("Bearer {}", token))
         .header("Accept", "application/json;charset=utf-8")
         .header("version", "1")
@@ -503,18 +605,27 @@ pub async fn search_ymgal(query: &str) -> Result<Vec<MetadataResult>, String> {
         return Err(format!("YMGal API error: {} - {}", status, body));
     }
 
-    let api_resp: YMGalApiResponse<YMGalSearchData> = resp.json().await
+    let api_resp: YMGalApiResponse<YMGalSearchData> = resp
+        .json()
+        .await
         .map_err(|e| format!("YMGal parse error: {}", e))?;
 
     if !api_resp.success {
-        return Err(format!("YMGal API failed: {}", api_resp.msg.unwrap_or_default()));
+        return Err(format!(
+            "YMGal API failed: {}",
+            api_resp.msg.unwrap_or_default()
+        ));
     }
 
-    let data = api_resp.data.unwrap_or(YMGalSearchData { result: Vec::new() });
+    let data = api_resp
+        .data
+        .unwrap_or(YMGalSearchData { result: Vec::new() });
 
     let mut out = Vec::new();
     for item in data.result.into_iter().take(15) {
-        let title = item.chinese_name.clone()
+        let title = item
+            .chinese_name
+            .clone()
             .or(item.name.clone())
             .unwrap_or_else(|| "Unknown".to_string());
         let original = item.name.clone();
@@ -544,32 +655,36 @@ pub async fn search_ymgal(query: &str) -> Result<Vec<MetadataResult>, String> {
 
 // ── 多源聚合搜索 ──
 
-pub async fn search_metadata_multi(query: &str, source: &str) -> Result<Vec<MetadataResult>, String> {
+pub async fn search_metadata_multi(
+    query: &str,
+    source: &str,
+    proxy: Option<&str>,
+) -> Result<Vec<MetadataResult>, String> {
     let keyword = query.trim();
     if keyword.is_empty() {
         return Ok(Vec::new());
     }
 
     match source {
-        "vndb" => search_vndb(keyword).await,
-        "steam" => search_steam_store(keyword).await,
-        "bangumi" => search_bangumi(keyword).await,
-        "ymgal" => search_ymgal(keyword).await,
+        "vndb" => search_vndb(keyword, proxy).await,
+        "steam" => search_steam_store(keyword, proxy).await,
+        "bangumi" => search_bangumi(keyword, proxy).await,
+        "ymgal" => search_ymgal(keyword, proxy).await,
         "all" | _ => {
             let mut merged: Vec<MetadataResult> = Vec::new();
 
-            // Run all searches, ignore individual failures
-            let vndb_results = search_vndb(keyword).await.unwrap_or_default();
-            merged.extend(vndb_results);
+            // Run all searches in parallel
+            let (vndb_res, bangumi_res, steam_res, ymgal_res) = tokio::join!(
+                search_vndb(keyword, proxy),
+                search_bangumi(keyword, proxy),
+                search_steam_store(keyword, proxy),
+                search_ymgal(keyword, proxy)
+            );
 
-            let bangumi_results = search_bangumi(keyword).await.unwrap_or_default();
-            merged.extend(bangumi_results);
-
-            let steam_results = search_steam_store(keyword).await.unwrap_or_default();
-            merged.extend(steam_results);
-
-            let ymgal_results = search_ymgal(keyword).await.unwrap_or_default();
-            merged.extend(ymgal_results);
+            merged.extend(vndb_res.unwrap_or_default());
+            merged.extend(bangumi_res.unwrap_or_default());
+            merged.extend(steam_res.unwrap_or_default());
+            merged.extend(ymgal_res.unwrap_or_default());
 
             let normalized_keyword = keyword.to_lowercase();
             merged.sort_by(|a, b| {
@@ -583,10 +698,10 @@ pub async fn search_metadata_multi(query: &str, source: &str) -> Result<Vec<Meta
                 }
 
                 let source_rank = |s: &Option<String>| match s.as_deref() {
-                    Some("VNDB") => 4,
-                    Some("Bangumi") => 3,
-                    Some("YMGal") => 2,
-                    Some("Steam") => 1,
+                    Some("Steam") => 4,
+                    Some("VNDB") => 3,
+                    Some("Bangumi") => 2,
+                    Some("YMGal") => 1,
                     _ => 0,
                 };
                 source_rank(&b.source).cmp(&source_rank(&a.source))
@@ -601,16 +716,38 @@ pub async fn search_metadata_multi(query: &str, source: &str) -> Result<Vec<Meta
 // ── 封面下载 ──
 
 /// Download cover image ensuring it is saved locally
-pub async fn download_cover(url: &str, target_path: &Path) -> Result<(), String> {
+pub async fn download_cover(
+    url: &str,
+    target_path: &Path,
+    proxy: Option<&str>,
+) -> Result<(), String> {
     if let Some(parent) = target_path.parent() {
         fs::create_dir_all(parent).map_err(|e| format!("Failed to create dir: {}", e))?;
     }
 
-    let response = reqwest::get(url).await.map_err(|e| format!("Download failed: {}", e))?;
-    let bytes = response.bytes().await.map_err(|e| format!("Failed to read bytes: {}", e))?;
+    let mut client_builder = Client::builder();
+    if let Some(p) = proxy {
+        if !p.trim().is_empty() {
+            client_builder =
+                client_builder.proxy(reqwest::Proxy::all(p).map_err(|e| e.to_string())?);
+        }
+    }
+    let client = client_builder.build().map_err(|e| e.to_string())?;
 
-    let mut file = fs::File::create(target_path).map_err(|e| format!("Failed to create file: {}", e))?;
-    file.write_all(&bytes).map_err(|e| format!("Failed to write file: {}", e))?;
+    let response = client
+        .get(url)
+        .send()
+        .await
+        .map_err(|e| format!("Download failed: {}", e))?;
+    let bytes = response
+        .bytes()
+        .await
+        .map_err(|e| format!("Failed to read bytes: {}", e))?;
+
+    let mut file =
+        fs::File::create(target_path).map_err(|e| format!("Failed to create file: {}", e))?;
+    file.write_all(&bytes)
+        .map_err(|e| format!("Failed to write file: {}", e))?;
 
     Ok(())
 }

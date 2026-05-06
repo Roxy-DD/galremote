@@ -1,10 +1,10 @@
 // 云同步功能 - WebDAV/S3/OneDrive/Google Drive
 use opendal::{Operator, services};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
-use sha2::{Digest, Sha256};
 
 #[derive(Error, Debug)]
 pub enum CloudError {
@@ -26,14 +26,14 @@ pub type CloudResult<T> = Result<T, CloudError>;
 pub enum CloudBackend {
     #[default]
     Disabled,
-    
+
     /// WebDAV 后端 (坚果云、阿里云盘等)
     WebDAV {
         endpoint: String,
         username: String,
         password: String,
     },
-    
+
     /// Amazon S3 / MinIO / 阿里云 OSS (兼容 S3)
     S3 {
         endpoint: String,
@@ -50,14 +50,14 @@ pub enum CloudBackend {
         access_key_id: String,
         access_key_secret: String,
     },
-    
+
     /// OneDrive
     OneDrive {
         client_id: String,
         client_secret: String,
         refresh_token: String,
     },
-    
+
     /// Google Drive
     GoogleDrive {
         client_id: String,
@@ -80,15 +80,15 @@ pub struct CloudSettings {
     /// 是否启用自动同步
     #[serde(default)]
     pub always_sync: bool,
-    
+
     /// 自动同步间隔（分钟），0表示禁用
     #[serde(default)]
     pub auto_sync_interval: u32,
-    
+
     /// 云端根目录
     #[serde(default = "default_root_path")]
     pub root_path: String,
-    
+
     /// 云存储后端
     #[serde(default)]
     pub backend: CloudBackend,
@@ -110,9 +110,9 @@ pub enum SyncStatus {
 /// 单个文件的元数据记录
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct FileMetadata {
-    pub hash: String,     // SHA-256
+    pub hash: String, // SHA-256
     pub size: u64,
-    pub mtime: i64,       // Modified time Unix timestamp
+    pub mtime: i64, // Modified time Unix timestamp
 }
 
 /// 云端与本地对齐的同步存根 (类似 Git Tree)
@@ -160,36 +160,57 @@ impl SyncManifest {
                 match save_unit.unit_type {
                     crate::galgame::game::SaveUnitType::File => {
                         if path.is_file() {
-                            let file_name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
+                            let file_name = path
+                                .file_name()
+                                .unwrap_or_default()
+                                .to_string_lossy()
+                                .to_string();
                             if let Ok(hash) = calculate_file_hash(&path) {
                                 let meta = std::fs::metadata(&path)?;
-                                let mtime = filetime::FileTime::from_last_modification_time(&meta).unix_seconds();
-                                manifest.files.insert(file_name, FileMetadata {
-                                    hash,
-                                    size: meta.len(),
-                                    mtime,
-                                });
+                                let mtime = filetime::FileTime::from_last_modification_time(&meta)
+                                    .unix_seconds();
+                                manifest.files.insert(
+                                    file_name,
+                                    FileMetadata {
+                                        hash,
+                                        size: meta.len(),
+                                        mtime,
+                                    },
+                                );
                             }
                         }
                     }
                     crate::galgame::game::SaveUnitType::Folder => {
                         if path.is_dir() {
-                            let base_name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
+                            let base_name = path
+                                .file_name()
+                                .unwrap_or_default()
+                                .to_string_lossy()
+                                .to_string();
                             for entry in WalkDir::new(&path).into_iter().filter_map(|e| e.ok()) {
                                 let entry_path = entry.path();
                                 if entry_path.is_file() {
                                     if let Ok(relative) = entry_path.strip_prefix(&path) {
-                                        let relative_str = relative.to_string_lossy().replace('\\', "/");
-                                        let archive_path = format!("{}/{}", base_name, relative_str);
-                                        
+                                        let relative_str =
+                                            relative.to_string_lossy().replace('\\', "/");
+                                        let archive_path =
+                                            format!("{}/{}", base_name, relative_str);
+
                                         if let Ok(hash) = calculate_file_hash(entry_path) {
                                             let meta = std::fs::metadata(entry_path)?;
-                                            let mtime = filetime::FileTime::from_last_modification_time(&meta).unix_seconds();
-                                            manifest.files.insert(archive_path, FileMetadata {
-                                                hash,
-                                                size: meta.len(),
-                                                mtime,
-                                            });
+                                            let mtime =
+                                                filetime::FileTime::from_last_modification_time(
+                                                    &meta,
+                                                )
+                                                .unix_seconds();
+                                            manifest.files.insert(
+                                                archive_path,
+                                                FileMetadata {
+                                                    hash,
+                                                    size: meta.len(),
+                                                    mtime,
+                                                },
+                                            );
                                         }
                                     }
                                 }
@@ -204,10 +225,7 @@ impl SyncManifest {
 
     /// 三向合并比较：本地 vs 云端
     /// 返回 HashMap<文件路径, 同步状态>
-    pub fn compare_manifests(
-        local: &Self,
-        cloud: &Option<Self>,
-    ) -> HashMap<String, SyncStatus> {
+    pub fn compare_manifests(local: &Self, cloud: &Option<Self>) -> HashMap<String, SyncStatus> {
         let mut changes = HashMap::new();
 
         if let Some(cloud_manifest) = cloud {
@@ -217,7 +235,7 @@ impl SyncManifest {
                     if local_meta.hash == cloud_meta.hash {
                         changes.insert(path.clone(), SyncStatus::UpToDate);
                     } else if local_meta.mtime > cloud_meta.mtime {
-                        // 本地改动且较新 (可能是继续游玩) 
+                        // 本地改动且较新 (可能是继续游玩)
                         if cloud_manifest.base_device_id != local.base_device_id {
                             changes.insert(path.clone(), SyncStatus::Conflict);
                         } else {
@@ -263,7 +281,7 @@ impl CloudBackend {
     /// 获取 OpenDAL Operator
     pub fn get_operator(&self, root_path: &str, proxy: Option<&str>) -> CloudResult<Operator> {
         use opendal::raw::HttpClient;
-        
+
         // 创建配置了代理的 reqwest Client
         let mut client_builder = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(60))
@@ -271,29 +289,43 @@ impl CloudBackend {
 
         if let Some(p) = proxy {
             if !p.trim().is_empty() {
-                client_builder = client_builder.proxy(reqwest::Proxy::all(p).map_err(|e| CloudError::CheckFailed(e.to_string()))?);
+                client_builder = client_builder.proxy(
+                    reqwest::Proxy::all(p).map_err(|e| CloudError::CheckFailed(e.to_string()))?,
+                );
             }
         }
-        
-        let reqwest_client = client_builder.build().map_err(|e| CloudError::CheckFailed(e.to_string()))?;
+
+        let reqwest_client = client_builder
+            .build()
+            .map_err(|e| CloudError::CheckFailed(e.to_string()))?;
         // 包装为 OpenDAL 的 HttpClient
         let http_client = HttpClient::with(reqwest_client);
 
         match self {
             CloudBackend::Disabled => Err(CloudError::Disabled),
-            
-            CloudBackend::WebDAV { endpoint, username, password } => {
+
+            CloudBackend::WebDAV {
+                endpoint,
+                username,
+                password,
+            } => {
                 let builder = services::Webdav::default()
                     .endpoint(endpoint)
                     .username(username)
                     .password(password)
                     .root(root_path)
                     .http_client(http_client);
-                
+
                 Ok(Operator::new(builder)?.finish())
             }
-            
-            CloudBackend::S3 { endpoint, bucket, region, access_key_id, secret_access_key } => {
+
+            CloudBackend::S3 {
+                endpoint,
+                bucket,
+                region,
+                access_key_id,
+                secret_access_key,
+            } => {
                 let builder = services::S3::default()
                     .endpoint(endpoint)
                     .bucket(bucket)
@@ -302,11 +334,16 @@ impl CloudBackend {
                     .secret_access_key(secret_access_key)
                     .root(root_path)
                     .http_client(http_client);
-                
+
                 Ok(Operator::new(builder)?.finish())
             }
- 
-            CloudBackend::AliyunOSS { endpoint, bucket, access_key_id, access_key_secret } => {
+
+            CloudBackend::AliyunOSS {
+                endpoint,
+                bucket,
+                access_key_id,
+                access_key_secret,
+            } => {
                 let builder = services::Oss::default()
                     .endpoint(endpoint)
                     .bucket(bucket)
@@ -314,56 +351,69 @@ impl CloudBackend {
                     .access_key_secret(access_key_secret)
                     .root(root_path)
                     .http_client(http_client);
-                    
+
                 Ok(Operator::new(builder)?.finish())
             }
-            
+
             // OneDrive 和 Google Drive 需要额外的 OAuth 流程，暂不实现
-            CloudBackend::OneDrive { .. } | CloudBackend::GoogleDrive { .. } => {
-                Err(CloudError::CheckFailed("OneDrive/Google Drive not yet implemented".into()))
-            }
- 
-            CloudBackend::GitHub { owner, repo, branch: _, token } => {
+            CloudBackend::OneDrive { .. } | CloudBackend::GoogleDrive { .. } => Err(
+                CloudError::CheckFailed("OneDrive/Google Drive not yet implemented".into()),
+            ),
+
+            CloudBackend::GitHub {
+                owner,
+                repo,
+                branch: _branch,
+                token,
+            } => {
                 let builder = services::Github::default()
                     .owner(owner)
                     .repo(repo)
                     .token(token)
                     .root(root_path)
                     .http_client(http_client);
-                    
+
+                // Note: OpenDAL GitHub service currently only supports the default branch.
+                // The 'branch' parameter is ignored for now.
+
                 Ok(Operator::new(builder)?.finish())
             }
         }
     }
 
-
-
     /// 上传剪贴板文本到云端
-    pub async fn upload_clipboard(&self, root_path: &str, text: &str, proxy: Option<&str>) -> CloudResult<()> {
+    pub async fn upload_clipboard(
+        &self,
+        root_path: &str,
+        text: &str,
+        proxy: Option<&str>,
+    ) -> CloudResult<()> {
         let op = self.get_operator(root_path, proxy)?;
         // 固定使用 clipboard.txt 作为同步文件
         let path = "clipboard.txt";
-        
+
         op.write(path, text.as_bytes().to_vec())
             .await
             .map_err(|e| CloudError::OpenDal(e))?;
-            
+
         Ok(())
     }
 
     /// 从云端下载剪贴板文本
-    pub async fn download_clipboard(&self, root_path: &str, proxy: Option<&str>) -> CloudResult<String> {
+    pub async fn download_clipboard(
+        &self,
+        root_path: &str,
+        proxy: Option<&str>,
+    ) -> CloudResult<String> {
         let op = self.get_operator(root_path, proxy)?;
         let path = "clipboard.txt";
-        
-        let content = op.read(path)
-            .await
-            .map_err(|e| CloudError::OpenDal(e))?;
-            
+
+        let content = op.read(path).await.map_err(|e| CloudError::OpenDal(e))?;
+
         let content_bytes = content.to_vec();
         let text = String::from_utf8(content_bytes)
             .map_err(|e| CloudError::CheckFailed(format!("Invalid UTF-8: {}", e)))?;
-            
+
         Ok(text)
     }
 
@@ -371,7 +421,7 @@ impl CloudBackend {
     pub async fn check_connection(&self, root_path: &str, proxy: Option<&str>) -> CloudResult<()> {
         const TEST_FILE: &str = ".connection_test";
         const TEST_CONTENT: &str = "sunshine-gui connection test";
- 
+
         let op = self.get_operator(root_path, proxy)?;
 
         // 1. 创建测试文件
@@ -380,10 +430,11 @@ impl CloudBackend {
             .map_err(|e| CloudError::CheckFailed(format!("Failed to write: {}", e)))?;
 
         // 2. 读取测试文件
-        let content = op.read(TEST_FILE)
+        let content = op
+            .read(TEST_FILE)
             .await
             .map_err(|e| CloudError::CheckFailed(format!("Failed to read: {}", e)))?;
-        
+
         let content_bytes = content.to_vec();
         let content_str = String::from_utf8_lossy(&content_bytes);
         if content_str != TEST_CONTENT {
@@ -440,7 +491,7 @@ pub async fn download_file(
 ) -> CloudResult<()> {
     let op = backend.get_operator(root_path, proxy)?;
     let content = op.read(remote_path).await?;
-    
+
     if let Some(parent) = local_path.parent() {
         std::fs::create_dir_all(parent)?;
     }
@@ -488,17 +539,17 @@ pub async fn delete_directory(
                     } else {
                         format!("{}/{}", path.trim_end_matches('/'), entry.name())
                     };
-                    
+
                     if entry.metadata().is_dir() {
                         let sub_files = Box::pin(list_recursive(op, &full_path)).await?;
                         files.extend(sub_files);
                         // 记录目录本身（某些后端可能需要显示删除目录）
-                        files.push(full_path); 
+                        files.push(full_path);
                     } else {
                         files.push(full_path);
                     }
                 }
-            },
+            }
             Err(e) => {
                 log::warn!("Failed to list during delete: {}, error: {}", path, e);
             }
@@ -515,10 +566,10 @@ pub async fn delete_directory(
             log::info!("Deleted cloud file: {}", file);
         }
     }
-    
+
     // 尝试删除根目录本身（如果不包含在列表中）
     let _ = op.delete(dir_path).await;
-    
+
     Ok(())
 }
 
@@ -534,17 +585,22 @@ pub async fn sync_all_to_cloud(
     let op = backend.get_operator(&settings.root_path, proxy)?;
     let mut count = 0;
 
-    let game_cloud_dir = format!("{}/{}", settings.root_path.trim_end_matches('/'), game.name);
+    // 路径相对于 Operator root (root_path 已在 get_operator 中设置)
+    let game_cloud_dir = game.name.clone();
     let manifest_path = format!("{}/sync_manifest.json", game_cloud_dir);
 
     // 1. 下载云端 Manifest
     let mut cloud_manifest: Option<SyncManifest> = None;
-    if op.exists(&manifest_path).await? {
-        if let Ok(content) = op.read(&manifest_path).await {
+    match op.read(&manifest_path).await {
+        Ok(content) => {
             if let Ok(manifest) = serde_json::from_slice::<SyncManifest>(&content.to_bytes()) {
                 cloud_manifest = Some(manifest);
             }
         }
+        Err(e) if e.kind() == opendal::ErrorKind::NotFound => {
+            // 首次同步，无云端 manifest
+        }
+        Err(e) => return Err(CloudError::OpenDal(e)),
     }
 
     // 2. 构建本地 Manifest
@@ -567,7 +623,10 @@ pub async fn sync_all_to_cloud(
             SyncStatus::Conflict => {
                 log::warn!("Sync Conflict detected on {}", relative_path);
                 if force == Some("local") {
-                    log::info!("Force override (local to cloud) applied for {}", relative_path);
+                    log::info!(
+                        "Force override (local to cloud) applied for {}",
+                        relative_path
+                    );
                 } else {
                     has_conflicts = true;
                 }
@@ -575,49 +634,65 @@ pub async fn sync_all_to_cloud(
             SyncStatus::LocalNewer => {}
         }
     }
-    
+
     // We do a second pass.
     for (relative_path, status) in &changes {
-        if *status == SyncStatus::LocalNewer || (*status == SyncStatus::Conflict && force == Some("local")) {
-                // 执行上传
-                // 还原出本地绝对路径
-                let mut uploaded = false;
-                for save_unit in &game.save_paths {
-                    if let Some(path_str) = save_unit.paths.get(device_id).or_else(|| save_unit.paths.get("default")) {
-                        let resolved_str = crate::galgame::archive::resolve_path_variables(path_str);
-                        let base_path = PathBuf::from(&resolved_str);
-                        
-                        let target_path = if save_unit.unit_type == crate::galgame::game::SaveUnitType::File {
+        if *status == SyncStatus::LocalNewer
+            || (*status == SyncStatus::Conflict && force == Some("local"))
+        {
+            // 执行上传
+            // 还原出本地绝对路径
+            let mut uploaded = false;
+            for save_unit in &game.save_paths {
+                if let Some(path_str) = save_unit
+                    .paths
+                    .get(device_id)
+                    .or_else(|| save_unit.paths.get("default"))
+                {
+                    let resolved_str = crate::galgame::archive::resolve_path_variables(path_str);
+                    let base_path = PathBuf::from(&resolved_str);
+
+                    let target_path =
+                        if save_unit.unit_type == crate::galgame::game::SaveUnitType::File {
                             base_path.clone()
                         } else {
                             // 必须去除 base_name 才能在物理磁盘找到
-                            let base_name = base_path.file_name().unwrap_or_default().to_string_lossy().to_string();
+                            let base_name = base_path
+                                .file_name()
+                                .unwrap_or_default()
+                                .to_string_lossy()
+                                .to_string();
                             if relative_path.starts_with(&format!("{}/", base_name)) {
-                                let stripped = relative_path.strip_prefix(&format!("{}/", base_name)).unwrap();
+                                let stripped = relative_path
+                                    .strip_prefix(&format!("{}/", base_name))
+                                    .unwrap();
                                 base_path.join(stripped)
                             } else {
                                 continue;
                             }
                         };
 
-                        if target_path.exists() && target_path.is_file() {
-                            let cloud_file_path = format!("{}/{}", game_cloud_dir, relative_path);
-                            if let Ok(content) = std::fs::read(&target_path) {
-                                if let Ok(_) = op.write(&cloud_file_path, content).await {
-                                    log::info!("Uploaded delta file: {}", relative_path);
-                                    count += 1;
-                                    uploaded = true;
-                                    break;
-                                }
+                    if target_path.exists() && target_path.is_file() {
+                        let cloud_file_path = format!("{}/{}", game_cloud_dir, relative_path);
+                        if let Ok(content) = std::fs::read(&target_path) {
+                            if let Ok(_) = op.write(&cloud_file_path, content).await {
+                                log::info!("Uploaded delta file: {}", relative_path);
+                                count += 1;
+                                uploaded = true;
+                                break;
                             }
                         }
                     }
                 }
-                if !uploaded {
-                    log::warn!("Failed to map or upload local file for path: {}", relative_path);
-                }
+            }
+            if !uploaded {
+                log::warn!(
+                    "Failed to map or upload local file for path: {}",
+                    relative_path
+                );
             }
         }
+    }
 
     // 5. 如果有硬冲突，中止 Manifest 上传。否则上传更新后的 Manifest
     if has_conflicts {
@@ -626,7 +701,21 @@ pub async fn sync_all_to_cloud(
         return Err(CloudError::CheckFailed("SYNC_CONFLICT".into()));
     }
 
-    if count > 0 {
+    // 检查是否需要更新清单：发生了文件上传，或者清单内容有变化（如本地删除了文件）
+    let mut manifest_needs_update = count > 0;
+    if !manifest_needs_update {
+        if let Some(ref cloud_m) = cloud_manifest {
+            if local_manifest.files != cloud_m.files {
+                manifest_needs_update = true;
+                log::info!("Local and cloud manifests differ, updating cloud manifest.");
+            }
+        } else if !local_manifest.files.is_empty() {
+            // 首次同步且本地有文件（虽然可能因为某种原因没上传），也创建清单
+            manifest_needs_update = true;
+        }
+    }
+
+    if manifest_needs_update {
         let manifest_json = serde_json::to_string_pretty(&local_manifest).unwrap_or_default();
         op.write(&manifest_path, manifest_json).await?;
         log::info!("Updated cloud sync_manifest.json for Game: {}", game.name);
@@ -647,21 +736,29 @@ pub async fn sync_all_from_cloud(
     let op = backend.get_operator(&settings.root_path, proxy)?;
     let mut count = 0;
 
-    let game_cloud_dir = format!("{}/{}", settings.root_path.trim_end_matches('/'), game.name);
+    // 路径相对于 Operator root (root_path 已在 get_operator 中设置)
+    let game_cloud_dir = game.name.clone();
     let manifest_path = format!("{}/sync_manifest.json", game_cloud_dir);
 
     // 1. 下载云端 Manifest
     let mut cloud_manifest: Option<SyncManifest> = None;
-    if op.exists(&manifest_path).await? {
-        if let Ok(content) = op.read(&manifest_path).await {
+    match op.read(&manifest_path).await {
+        Ok(content) => {
             if let Ok(manifest) = serde_json::from_slice::<SyncManifest>(&content.to_bytes()) {
                 cloud_manifest = Some(manifest);
             }
         }
+        Err(e) if e.kind() == opendal::ErrorKind::NotFound => {
+            // 首次同步，无云端 manifest
+        }
+        Err(e) => return Err(CloudError::OpenDal(e)),
     }
 
     if cloud_manifest.is_none() {
-        log::info!("No cloud manifest found for {}, nothing to download.", game.name);
+        log::info!(
+            "No cloud manifest found for {}, nothing to download.",
+            game.name
+        );
         return Ok(0);
     }
 
@@ -676,42 +773,75 @@ pub async fn sync_all_from_cloud(
     // 4. 执行云端覆盖到本地
     for (relative_path, status) in changes {
         match status {
-            SyncStatus::CloudNewer | SyncStatus::Conflict if force == Some("cloud") || status == SyncStatus::CloudNewer => {
+            SyncStatus::CloudNewer | SyncStatus::Conflict
+                if force == Some("cloud") || status == SyncStatus::CloudNewer =>
+            {
                 if status == SyncStatus::Conflict && force == Some("cloud") {
-                     log::info!("Force override (cloud to local) applied for {}", relative_path);
+                    log::info!(
+                        "Force override (cloud to local) applied for {}",
+                        relative_path
+                    );
                 }
-                
+
                 let cloud_file_path = format!("{}/{}", game_cloud_dir, relative_path);
-                
+
                 // 还原本地写入路径
                 let mut downloaded = false;
                 for save_unit in &game.save_paths {
-                    if let Some(path_str) = save_unit.paths.get(device_id).or_else(|| save_unit.paths.get("default")) {
-                        let resolved_str = crate::galgame::archive::resolve_path_variables(path_str);
+                    if let Some(path_str) = save_unit
+                        .paths
+                        .get(device_id)
+                        .or_else(|| save_unit.paths.get("default"))
+                    {
+                        let resolved_str =
+                            crate::galgame::archive::resolve_path_variables(path_str);
                         let base_path = PathBuf::from(&resolved_str);
-                        
-                        let target_path = if save_unit.unit_type == crate::galgame::game::SaveUnitType::File {
-                            //如果是单文件映射，必须确保文件名一致
-                            let base_name = base_path.file_name().unwrap_or_default().to_string_lossy().to_string();
-                            if relative_path == base_name {
-                                base_path.clone()
+
+                        let target_path =
+                            if save_unit.unit_type == crate::galgame::game::SaveUnitType::File {
+                                //如果是单文件映射，必须确保文件名一致
+                                let base_name = base_path
+                                    .file_name()
+                                    .unwrap_or_default()
+                                    .to_string_lossy()
+                                    .to_string();
+                                if relative_path == base_name {
+                                    base_path.clone()
+                                } else {
+                                    continue;
+                                }
                             } else {
-                                continue;
-                            }
-                        } else {
-                            let base_name = base_path.file_name().unwrap_or_default().to_string_lossy().to_string();
-                            if relative_path.starts_with(&format!("{}/", base_name)) {
-                                let stripped = relative_path.strip_prefix(&format!("{}/", base_name)).unwrap();
-                                base_path.join(stripped)
-                            } else {
-                                continue;
-                            }
-                        };
+                                let base_name = base_path
+                                    .file_name()
+                                    .unwrap_or_default()
+                                    .to_string_lossy()
+                                    .to_string();
+                                if relative_path.starts_with(&format!("{}/", base_name)) {
+                                    let stripped = relative_path
+                                        .strip_prefix(&format!("{}/", base_name))
+                                        .unwrap();
+                                    base_path.join(stripped)
+                                } else {
+                                    continue;
+                                }
+                            };
 
                         if let Ok(content) = op.read(&cloud_file_path).await {
                             if let Some(parent) = target_path.parent() {
                                 let _ = std::fs::create_dir_all(parent);
                             }
+                            // Backup existing file if any
+                            if target_path.exists() {
+                                let bak_path = target_path.with_extension(format!(
+                                    "{}.bak",
+                                    target_path
+                                        .extension()
+                                        .and_then(|e| e.to_str())
+                                        .unwrap_or("")
+                                ));
+                                let _ = std::fs::rename(&target_path, &bak_path);
+                            }
+
                             if let Ok(_) = std::fs::write(&target_path, content.to_vec()) {
                                 log::info!("Downloaded delta file: {}", relative_path);
                                 count += 1;
@@ -722,12 +852,18 @@ pub async fn sync_all_from_cloud(
                     }
                 }
                 if !downloaded {
-                    log::warn!("Could not map relative cloud path to local: {}", relative_path);
+                    log::warn!(
+                        "Could not map relative cloud path to local: {}",
+                        relative_path
+                    );
                 }
             }
             SyncStatus::Conflict => {
                 if force != Some("cloud") {
-                    log::warn!("Sync Conflict detected on {}. Skipping download.", relative_path);
+                    log::warn!(
+                        "Sync Conflict detected on {}. Skipping download.",
+                        relative_path
+                    );
                     has_conflicts = true;
                 }
             }
@@ -754,10 +890,9 @@ mod tests {
                 endpoint: String::new(),
                 username: String::new(),
                 password: String::new(),
-            }.type_name(),
+            }
+            .type_name(),
             "WebDAV"
         );
     }
 }
-
-
