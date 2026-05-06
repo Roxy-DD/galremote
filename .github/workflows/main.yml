@@ -213,6 +213,14 @@ jobs:
           CARGO_BIN="/c/Users/${WINDOWS_USER}/.cargo/bin"
           export PATH="$CARGO_BIN:$PATH"
           
+          # Debug: check tool locations again in this specific session
+          echo "Current PATH: $PATH"
+          which cmake
+          which ninja
+          which node
+          which npm
+          which cargo
+          
           mkdir -p build
           cmake \
             -B build \
@@ -223,8 +231,11 @@ jobs:
             -DSUNSHINE_PUBLISHER_NAME='${{ github.repository_owner }}' \
             -DSUNSHINE_PUBLISHER_WEBSITE='https://github.com/qiin2333/Sunshine-Foundation' \
             -DSUNSHINE_PUBLISHER_ISSUE_URL='https://github.com/qiin2333/Sunshine-Foundation/issues'
-          ninja -C build
-          ninja -C build sunshine-control-panel
+            
+          echo "Starting core build..."
+          ninja -v -C build
+          echo "Starting control panel build..."
+          ninja -v -C build sunshine-control-panel
 
       - name: Package Windows
         shell: msys2 {0}
