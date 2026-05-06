@@ -14,8 +14,8 @@ list(APPEND SUNSHINE_COMPILE_OPTIONS -Wno-misleading-indentation)
 # can remove after https://gcc.gnu.org/bugzilla/show_bug.cgi?id=120495 is available in mingw-w64
 list(APPEND SUNSHINE_COMPILE_OPTIONS -Wno-template-body)
 
-# Suppress permissive warnings for NVAPI header files that are strict-standards-compliant
-list(APPEND SUNSHINE_COMPILE_OPTIONS -Wno-permissive)
+# Suppress permissive warnings for NVAPI header files
+list(APPEND SUNSHINE_COMPILE_OPTIONS -fpermissive)
 
 # see gcc bug 98723
 add_definitions(-DUSE_BOOST_REGEX)

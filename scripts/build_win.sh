@@ -19,14 +19,18 @@ ninja --version || echo "NINJA FAILED"
 cargo --version || echo "CARGO FAILED"
 
 echo "=== Patching Submodules for GCC Compatibility ==="
-# Remove __success SAL annotation that GCC doesn't understand
-sed -i 's/extern __success(return == NVAPI_OK) NvAPI_status/extern NvAPI_status/g' third-party/nvapi-open-source-sdk/nvapi_lite_salstart.h
+# Aggressively remove all SAL annotations from NVAPI SDK headers
+# These cause pervasive compilation errors with GCC/MinGW
+# 1. Remove __success parameterized annotations
+find third-party/nvapi-open-source-sdk -type f \( -name "*.h" -o -name "*.c" -o -name "*.cpp" \) -exec sed -E -i 's/__success\([^)]*\)//g' {} +
 
-# Strip all remaining SAL annotations (__in, __out, __inout, etc.)
-# These are Windows-specific SAL (Source Code Annotation Language) annotations
-sed -i 's/__in\b//g' third-party/nvapi-open-source-sdk/nvapi.h
-sed -i 's/__out\b//g' third-party/nvapi-open-source-sdk/nvapi.h
-sed -i 's/__inout\b//g' third-party/nvapi-open-source-sdk/nvapi.h
+# 2. Strip simple SAL annotations (word boundary ensures we don't hit __cdecl etc)
+for macro in __in __out __inout __in_opt __out_opt __inout_opt __checkReturn __success; do
+    find third-party/nvapi-open-source-sdk -type f \( -name "*.h" -o -name "*.c" -o -name "*.cpp" \) -exec sed -i "s/\b${macro}\b//g" {} +
+done
+
+# 3. Strip other parameterized SAL annotations (e.g. __in_ecount(size))
+find third-party/nvapi-open-source-sdk -type f \( -name "*.h" -o -name "*.c" -o -name "*.cpp" \) -exec sed -E -i 's/\b__[a-z_]+\([^)]*\)//g' {} +
 
 echo "=== Starting Build ==="
 mkdir -p build
