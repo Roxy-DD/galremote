@@ -18,6 +18,9 @@ cmake --version || echo "CMAKE FAILED"
 ninja --version || echo "NINJA FAILED"
 cargo --version || echo "CARGO FAILED"
 
+echo "=== Patching Submodules for GCC Compatibility ==="
+sed -i 's/extern __success(return == NVAPI_OK) NvAPI_Status/extern NvAPI_Status/g' third-party/nvapi-open-source-sdk/nvapi_lite_salstart.h
+
 echo "=== Starting Build ==="
 mkdir -p build
 cmake -B build -G Ninja -S . \
