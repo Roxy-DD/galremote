@@ -70,11 +70,4 @@
 	path = third-party/wlr-protocols
 	url = https://github.com/LizardByte-infrastructure/wlr-protocols.git
 	branch = master
-[submodule "src_assets/common/sunshine-control-panel"]
-	path = src_assets/common/sunshine-control-panel
-	url = https://github.com/Roxy-DD/galremote-control-panel.git
-	branch = main
-[submodule "src_assets/common/vnite"]
-	path = src_assets/common/vnite
-	url = https://github.com/ximu3/vnite
-	branch = main
+
