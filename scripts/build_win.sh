@@ -22,6 +22,8 @@ echo "=== Starting Build ==="
 mkdir -p build
 cmake -B build -G Ninja -S . \
   -DBUILD_DOCS=OFF \
+  -DCMAKE_PREFIX_PATH="C:/msys64/ucrt64" \
+  -DOPENSSL_ROOT_DIR="C:/msys64/ucrt64" \
   -DSUNSHINE_ASSETS_DIR=assets \
   -DSUNSHINE_PUBLISHER_NAME="${GITHUB_REPOSITORY_OWNER}" \
   -DSUNSHINE_PUBLISHER_WEBSITE="https://github.com/qiin2333/Sunshine-Foundation" \
