@@ -208,22 +208,17 @@ jobs:
           BUILD_VERSION: ${{ needs.setup_release.outputs.release_tag }}.custom
           COMMIT: ${{ needs.setup_release.outputs.release_commit }}
         run: |
-          # add Rust to PATH for Tauri GUI build
           WINDOWS_USER=$(cmd //c "echo %USERNAME%" | tr -d '\r')
           CARGO_BIN="/c/Users/${WINDOWS_USER}/.cargo/bin"
           export PATH="$CARGO_BIN:$PATH"
-          
-          # Debug: check tool locations again in this specific session
           echo "Current PATH: $PATH"
           which cmake
           which ninja
           which node
           which npm
           which cargo
-          
           mkdir -p build
           cmake -B build -G Ninja -S . -DBUILD_DOCS=OFF -DSUNSHINE_ASSETS_DIR=assets -DSUNSHINE_PUBLISHER_NAME="${{ github.repository_owner }}" -DSUNSHINE_PUBLISHER_WEBSITE="https://github.com/qiin2333/Sunshine-Foundation" -DSUNSHINE_PUBLISHER_ISSUE_URL="https://github.com/qiin2333/Sunshine-Foundation/issues"
-            
           echo "Starting core build..."
           ninja -v -C build
           echo "Starting control panel build..."
