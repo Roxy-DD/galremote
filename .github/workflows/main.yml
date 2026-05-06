@@ -96,23 +96,8 @@ jobs:
             wget
 
       - name: Update Windows dependencies
-        env:
-          gcc_version: '15.1.0-5'
         shell: bash
-        run: |
-          export PATH="/c/msys64/ucrt64/bin:/c/msys64/usr/bin:$PATH"
-          broken_deps=("mingw-w64-ucrt-x86_64-gcc" "mingw-w64-ucrt-x86_64-gcc-libs")
-          tarballs=""
-          for dep in "${broken_deps[@]}"; do
-            tarball="${dep}-${gcc_version}-any.pkg.tar.zst"
-            wget https://repo.msys2.org/mingw/ucrt64/${tarball}
-            tarballs="${tarballs} ${tarball}"
-          done
-          if [ -n "$tarballs" ]; then
-            pacman -U --noconfirm ${tarballs}
-          fi
-          dependencies=("git" "mingw-w64-ucrt-x86_64-cmake" "mingw-w64-ucrt-x86_64-ninja" "mingw-w64-ucrt-x86_64-cppwinrt" "mingw-w64-ucrt-x86_64-curl-winssl" "mingw-w64-ucrt-x86_64-graphviz" "mingw-w64-ucrt-x86_64-MinHook" "mingw-w64-ucrt-x86_64-miniupnpc" "mingw-w64-ucrt-x86_64-nlohmann-json" "mingw-w64-ucrt-x86_64-nodejs" "mingw-w64-ucrt-x86_64-nsis" "mingw-w64-ucrt-x86_64-onevpl" "mingw-w64-ucrt-x86_64-openssl" "mingw-w64-ucrt-x86_64-opus" "mingw-w64-ucrt-x86_64-toolchain")
-          pacman -Syu --noconfirm --ignore="$(IFS=,; echo "${broken_deps[*]}")" "${dependencies[@]}"
+        run: bash scripts/setup_deps.sh
 
       - name: Install Rust (for Tauri GUI)
         shell: bash
@@ -127,18 +112,8 @@ jobs:
           BRANCH: ${{ github.head_ref || github.ref_name }}
           BUILD_VERSION: ${{ needs.setup_release.outputs.release_tag }}.custom
           COMMIT: ${{ needs.setup_release.outputs.release_commit }}
-        run: |
-          export PATH="/c/Users/runneradmin/.cargo/bin:/c/msys64/ucrt64/bin:/c/msys64/usr/bin:$PATH"
-          echo "PATH set to: $PATH"
-          which cmake
-          which ninja
-          which node
-          which npm
-          which cargo
-          mkdir -p build
-          cmake -B build -G Ninja -S . -DBUILD_DOCS=OFF -DSUNSHINE_ASSETS_DIR=assets -DSUNSHINE_PUBLISHER_NAME="${{ github.repository_owner }}" -DSUNSHINE_PUBLISHER_WEBSITE="https://github.com/qiin2333/Sunshine-Foundation" -DSUNSHINE_PUBLISHER_ISSUE_URL="https://github.com/qiin2333/Sunshine-Foundation/issues"
-          ninja -v -C build
-          ninja -v -C build sunshine-control-panel
+          GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
+        run: bash scripts/build_win.sh
 
       - name: Package Windows
         shell: bash
