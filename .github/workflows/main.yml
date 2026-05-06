@@ -100,7 +100,7 @@ jobs:
           gcc_version: '15.1.0-5'
         shell: bash
         run: |
-          export PATH="/ucrt64/bin:/usr/bin:$PATH"
+          export PATH="/c/msys64/ucrt64/bin:/c/msys64/usr/bin:$PATH"
           broken_deps=("mingw-w64-ucrt-x86_64-gcc" "mingw-w64-ucrt-x86_64-gcc-libs")
           tarballs=""
           for dep in "${broken_deps[@]}"; do
@@ -128,7 +128,7 @@ jobs:
           BUILD_VERSION: ${{ needs.setup_release.outputs.release_tag }}.custom
           COMMIT: ${{ needs.setup_release.outputs.release_commit }}
         run: |
-          export PATH="/c/Users/runneradmin/.cargo/bin:/ucrt64/bin:/usr/bin:$PATH"
+          export PATH="/c/Users/runneradmin/.cargo/bin:/c/msys64/ucrt64/bin:/c/msys64/usr/bin:$PATH"
           echo "PATH set to: $PATH"
           which cmake
           which ninja
@@ -143,7 +143,7 @@ jobs:
       - name: Package Windows
         shell: bash
         run: |
-          export PATH="/ucrt64/bin:/usr/bin:$PATH"
+          export PATH="/c/msys64/ucrt64/bin:/c/msys64/usr/bin:$PATH"
           mkdir -p artifacts
           cd build
           cpack -G NSIS --config ./CPackConfig.cmake --verbose
@@ -173,7 +173,7 @@ jobs:
       - name: Rename release assets
         shell: bash
         run: |
-          # Format tag to vYEAR.DATE where DATE is zero-padded to 4 digits
+          export PATH="/c/msys64/ucrt64/bin:/c/msys64/usr/bin:$PATH"
           TAG="${{ needs.setup_release.outputs.release_tag }}"
           NEWTAG="$TAG"
 
