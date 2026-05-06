@@ -21,7 +21,12 @@ namespace {
   void
   fill_nvapi_string(NvAPI_UnicodeString &dest, const wchar_t *src) {
     static_assert(sizeof(NvU16) == sizeof(wchar_t));
-    memcpy_s(dest, NVAPI_UNICODE_STRING_MAX * sizeof(NvU16), src, (wcslen(src) + 1) * sizeof(wchar_t));
+    auto len = (wcslen(src) + 1) * sizeof(wchar_t);
+    if (len > NVAPI_UNICODE_STRING_MAX * sizeof(NvU16)) {
+      len = NVAPI_UNICODE_STRING_MAX * sizeof(NvU16);
+    }
+    memcpy(dest, src, len);
+    dest[NVAPI_UNICODE_STRING_MAX - 1] = 0;
   }
 
 }  // namespace
