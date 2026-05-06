@@ -98,120 +98,38 @@ jobs:
       - name: Update Windows dependencies
         env:
           gcc_version: '15.1.0-5'
-        shell: msys2 {0}
+        shell: bash
         run: |
-          broken_deps=(
-            "mingw-w64-ucrt-x86_64-gcc"
-            "mingw-w64-ucrt-x86_64-gcc-libs"
-          )
-
+          export PATH="/ucrt64/bin:/usr/bin:$PATH"
+          broken_deps=("mingw-w64-ucrt-x86_64-gcc" "mingw-w64-ucrt-x86_64-gcc-libs")
           tarballs=""
           for dep in "${broken_deps[@]}"; do
             tarball="${dep}-${gcc_version}-any.pkg.tar.zst"
-
-            # download and install working version
             wget https://repo.msys2.org/mingw/ucrt64/${tarball}
-
             tarballs="${tarballs} ${tarball}"
           done
-
-          # install broken dependencies
           if [ -n "$tarballs" ]; then
             pacman -U --noconfirm ${tarballs}
           fi
-
-          # install dependencies
-          dependencies=(
-            "git"
-            "mingw-w64-ucrt-x86_64-cmake"
-            "mingw-w64-ucrt-x86_64-ninja"
-            "mingw-w64-ucrt-x86_64-cppwinrt"
-            "mingw-w64-ucrt-x86_64-curl-winssl"
-            "mingw-w64-ucrt-x86_64-graphviz"
-            "mingw-w64-ucrt-x86_64-MinHook"
-            "mingw-w64-ucrt-x86_64-miniupnpc"
-            "mingw-w64-ucrt-x86_64-nlohmann-json"
-            "mingw-w64-ucrt-x86_64-nodejs"
-            "mingw-w64-ucrt-x86_64-nsis"
-            "mingw-w64-ucrt-x86_64-onevpl"
-            "mingw-w64-ucrt-x86_64-openssl"
-            "mingw-w64-ucrt-x86_64-opus"
-            "mingw-w64-ucrt-x86_64-toolchain"
-          )
-
-          # Note: mingw-w64-ucrt-x86_64-rust conflicts with fixed gcc-15.1.0-5
-          # We install Rust via rustup in a separate step
-
+          dependencies=("git" "mingw-w64-ucrt-x86_64-cmake" "mingw-w64-ucrt-x86_64-ninja" "mingw-w64-ucrt-x86_64-cppwinrt" "mingw-w64-ucrt-x86_64-curl-winssl" "mingw-w64-ucrt-x86_64-graphviz" "mingw-w64-ucrt-x86_64-MinHook" "mingw-w64-ucrt-x86_64-miniupnpc" "mingw-w64-ucrt-x86_64-nlohmann-json" "mingw-w64-ucrt-x86_64-nodejs" "mingw-w64-ucrt-x86_64-nsis" "mingw-w64-ucrt-x86_64-onevpl" "mingw-w64-ucrt-x86_64-openssl" "mingw-w64-ucrt-x86_64-opus" "mingw-w64-ucrt-x86_64-toolchain")
           pacman -Syu --noconfirm --ignore="$(IFS=,; echo "${broken_deps[*]}")" "${dependencies[@]}"
 
       - name: Install Rust (for Tauri GUI)
-        shell: msys2 {0}
+        shell: bash
         run: |
-          echo "Installing Rust via rustup..."
-          
-          # Rust installs to Windows user directory
-          WINDOWS_USER=$(cmd //c "echo %USERNAME%" | tr -d '\r')
-          CARGO_BIN="/c/Users/${WINDOWS_USER}/.cargo/bin"
-          export PATH="$CARGO_BIN:$PATH"
-          
-          # Check if cargo already exists
-          if command -v cargo &> /dev/null; then
-            echo "Rust already installed: $(cargo --version)"
-          else
-            # Download and install rustup
-            curl --proto '=https' --tlsv1.2 -sSf https://win.rustup.rs/x86_64 -o /tmp/rustup-init.exe
-            /tmp/rustup-init.exe -y --default-toolchain stable --profile minimal
-            
-            # Refresh PATH
-            sleep 3
-            export PATH="$CARGO_BIN:$PATH"
-            
-            # Verify installation
-            if [ -f "$CARGO_BIN/cargo.exe" ]; then
-              echo "Rust installed successfully: $(cargo --version)"
-            else
-              echo "Warning: Rust installed but cargo not found at $CARGO_BIN"
-              exit 1
-            fi
-          fi
-
-      - name: Verify Build Tools
-        shell: msys2 {0}
-        run: |
-          echo "Verifying build tools are installed..."
-          which cmake || (echo "cmake not found" && exit 1)
-          which ninja || (echo "ninja not found" && exit 1)
-          which gcc || (echo "gcc not found" && exit 1)
-          
-          # verify Rust is in PATH
-          WINDOWS_USER=$(cmd //c "echo %USERNAME%" | tr -d '\r')
-          CARGO_BIN="/c/Users/${WINDOWS_USER}/.cargo/bin"
-          export PATH="$CARGO_BIN:$PATH"
-          
-          which cargo || (echo "cargo not found" && exit 1)
-          
-          echo "All build tools verified successfully"
-          echo "  CMake: $(cmake --version | head -1)"
-          echo "  Ninja: $(ninja --version)"
-          echo "  GCC: $(gcc --version | head -1)"
-          echo "  Cargo: $(cargo --version)"
-
-      - name: Cache Rust dependencies
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: "src_assets/common/sunshine-control-panel/src-tauri -> target"
+          curl --proto '=https' --tlsv1.2 -sSf https://win.rustup.rs/x86_64 -o rustup-init.exe
+          ./rustup-init.exe -y --default-toolchain stable --profile minimal
+          rm rustup-init.exe
 
       - name: Build Windows
-        shell: msys2 {0}
+        shell: bash
         env:
           BRANCH: ${{ github.head_ref || github.ref_name }}
           BUILD_VERSION: ${{ needs.setup_release.outputs.release_tag }}.custom
           COMMIT: ${{ needs.setup_release.outputs.release_commit }}
         run: |
-          WINDOWS_USER=$(cmd //c "echo %USERNAME%" | tr -d '\r')
-          CARGO_BIN="/c/Users/${WINDOWS_USER}/.cargo/bin"
-          export PATH="$CARGO_BIN:$PATH"
-          echo "Current PATH: $PATH"
+          export PATH="/c/Users/runneradmin/.cargo/bin:/ucrt64/bin:/usr/bin:$PATH"
+          echo "PATH set to: $PATH"
           which cmake
           which ninja
           which node
@@ -219,22 +137,17 @@ jobs:
           which cargo
           mkdir -p build
           cmake -B build -G Ninja -S . -DBUILD_DOCS=OFF -DSUNSHINE_ASSETS_DIR=assets -DSUNSHINE_PUBLISHER_NAME="${{ github.repository_owner }}" -DSUNSHINE_PUBLISHER_WEBSITE="https://github.com/qiin2333/Sunshine-Foundation" -DSUNSHINE_PUBLISHER_ISSUE_URL="https://github.com/qiin2333/Sunshine-Foundation/issues"
-          echo "Starting core build..."
           ninja -v -C build
-          echo "Starting control panel build..."
           ninja -v -C build sunshine-control-panel
 
       - name: Package Windows
-        shell: msys2 {0}
+        shell: bash
         run: |
+          export PATH="/ucrt64/bin:/usr/bin:$PATH"
           mkdir -p artifacts
           cd build
-
-          # package - 生成 NSIS 安装包和 ZIP 便携版
           cpack -G NSIS --config ./CPackConfig.cmake --verbose
           cpack -G ZIP --config ./CPackConfig.cmake --verbose
-
-          # move
           mv ./cpack_artifacts/Sunshine.exe ../artifacts/sunshine-windows-installer.exe
           mv ./cpack_artifacts/Sunshine.zip ../artifacts/sunshine-windows-portable.zip
 
@@ -258,7 +171,7 @@ jobs:
             a "../artifacts/sunshine-win32-debuginfo.7z" "*.dbg"
 
       - name: Rename release assets
-        shell: msys2 {0}
+        shell: bash
         run: |
           # Format tag to vYEAR.DATE where DATE is zero-padded to 4 digits
           TAG="${{ needs.setup_release.outputs.release_tag }}"
