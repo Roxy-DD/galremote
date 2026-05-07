@@ -745,14 +745,14 @@ defineExpose({
 .gm-detail-title-caption {
   flex: 1;
   padding-bottom: 8px;
-  
-  h1 {
-    margin: 0 0 16px;
-    font-size: 36px;
-    font-weight: 800;
-    line-height: 1.2;
-    text-shadow: 0 2px 10px rgba(0,0,0,0.5);
-  }
+}
+
+.gm-detail-title-caption h1 {
+  margin: 0 0 16px;
+  font-size: 36px;
+  font-weight: 800;
+  line-height: 1.2;
+  text-shadow: 0 2px 10px rgba(0,0,0,0.5);
 }
 
 .gm-detail-meta-row {
@@ -775,12 +775,12 @@ defineExpose({
 
 .gm-detail-section {
   margin-top: 32px;
-  
-  h3 {
-    font-size: 18px;
-    margin-bottom: 16px;
-    color: rgba(255,255,255,0.9);
-  }
+}
+
+.gm-detail-section h3 {
+  font-size: 18px;
+  margin-bottom: 16px;
+  color: rgba(255,255,255,0.9);
 }
 
 .description-text {
@@ -817,12 +817,6 @@ defineExpose({
     
     .gura-hint {
       margin-bottom: 32px;
-      p {
-        font-size: 16px;
-        font-weight: 700;
-        color: var(--vnite-primary);
-        margin-bottom: 8px;
-      }
       .desc {
         font-size: 13px;
         font-weight: 400;
@@ -840,6 +834,12 @@ defineExpose({
     }
   }
 }
-</style>
 
+.vnite-scan-starter-dialog .scan-starter-body .gura-hint p {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--vnite-primary);
+  margin-bottom: 8px;
+}
+</style>
 

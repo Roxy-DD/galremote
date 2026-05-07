@@ -7,13 +7,13 @@ name: Manual Release
 on:
   workflow_dispatch:
     inputs:
-      run-id:
+      run_id:
         description: "Workflow Run ID to download artifacts from (leave empty for latest successful build)"
         required: false
-      release-tag:
+      release_tag:
         description: "Release tag name (e.g., v1.0.3)"
         required: true
-      release-name:
+      release_name:
         description: "Release name (leave empty to use tag name)"
         required: false
       prerelease:
@@ -46,17 +46,17 @@ jobs:
 
       # 如果提供了 run-id，从指定的 run 下载
       - name: Download specific artifact
-        if: ${{ github.event.inputs.run-id != '' }}
+        if: ${{ github.event.inputs.run_id != '' }}
         uses: actions/download-artifact@v4
         with:
           name: sunshine-windows
           path: artifacts
-          run-id: ${{ github.event.inputs.run-id }}
+          run-id: ${{ github.event.inputs.run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       # 如果没有提供 run-id，从最近的成功构建下载
       - name: Download latest artifact
-        if: ${{ github.event.inputs.run-id == '' }}
+        if: ${{ github.event.inputs.run_id == '' }}
         uses: dawidd6/action-download-artifact@v3
         with:
           workflow: main.yml
@@ -64,6 +64,13 @@ jobs:
           path: artifacts
           check_artifacts: true
           search_artifacts: true
+
+      - name: Normalize artifact layout
+        run: |
+          mkdir -p artifacts-flat
+          find artifacts -type f \( -name "*.exe" -o -name "*.zip" -o -name "*.7z" -o -name "SHA256SUMS.txt" -o -name "checksums.json" \) -exec cp {} artifacts-flat/ \;
+          rm -rf artifacts
+          mv artifacts-flat artifacts
 
       - name: List downloaded files
         run: |
@@ -106,10 +113,7 @@ jobs:
           mkdir -p release-files
           
           # 复制所有发布文件
-          cp artifacts/*.exe release-files/ 2>/dev/null || true
-          cp artifacts/*.zip release-files/ 2>/dev/null || true
-          cp artifacts/SHA256SUMS.txt release-files/ 2>/dev/null || true
-          cp artifacts/checksums.json release-files/ 2>/dev/null || true
+          find artifacts -maxdepth 1 -type f \( -name "*.exe" -o -name "*.zip" -o -name "*.7z" -o -name "SHA256SUMS.txt" -o -name "checksums.json" \) -exec cp {} release-files/ \;
           
           echo "Release files:"
           ls -lh release-files/
@@ -117,8 +121,8 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ github.event.inputs.release-tag }}
-          name: ${{ github.event.inputs.release-name || github.event.inputs.release-tag }}
+          tag_name: ${{ github.event.inputs.release_tag }}
+          name: ${{ github.event.inputs.release_name || github.event.inputs.release_tag }}
           files: release-files/*
           draft: ${{ github.event.inputs.draft == 'true' }}
           prerelease: ${{ github.event.inputs.prerelease == 'true' }}
@@ -130,8 +134,8 @@ jobs:
         run: |
           echo "## Release Created" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Tag**: ${{ github.event.inputs.release-tag }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Name**: ${{ github.event.inputs.release-name || github.event.inputs.release-tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tag**: ${{ github.event.inputs.release_tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Name**: ${{ github.event.inputs.release_name || github.event.inputs.release_tag }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Pre-release**: ${{ github.event.inputs.prerelease }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Draft**: ${{ github.event.inputs.draft }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY

@@ -126,12 +126,6 @@ jobs:
           mv ./cpack_artifacts/Sunshine.exe ../artifacts/sunshine-windows-installer.exe
           mv ./cpack_artifacts/Sunshine.zip ../artifacts/sunshine-windows-portable.zip
 
-      - name: Generate Checksums
-        shell: pwsh
-        run: |
-          # 生成 SHA256 校验和
-          .\scripts\generate-checksums.ps1 -Path .\artifacts -Output "SHA256SUMS.txt"
-
       - name: Package Windows Debug Info
         working-directory: build
         run: |
@@ -162,6 +156,13 @@ jobs:
           # 重命名安装包和便携版
           mv artifacts/sunshine-windows-installer.exe "artifacts/Sunshine.${NEWTAG}.WindowsInstaller.exe"
           mv artifacts/sunshine-windows-portable.zip "artifacts/Sunshine.${NEWTAG}.WindowsPortable.zip"
+          mv artifacts/sunshine-win32-debuginfo.7z "artifacts/Sunshine.${NEWTAG}.WindowsDebugInfo.7z"
+
+      - name: Generate Checksums
+        shell: pwsh
+        run: |
+          # 生成最终发布文件的 SHA256 校验和
+          .\scripts\generate-checksums.ps1 -Path .\artifacts -Output "SHA256SUMS.txt"
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
@@ -170,6 +171,7 @@ jobs:
           path: |
             artifacts/Sunshine.*.WindowsInstaller.exe
             artifacts/Sunshine.*.WindowsPortable.zip
+            artifacts/Sunshine.*.WindowsDebugInfo.7z
             artifacts/SHA256SUMS.txt
             artifacts/checksums.json
           if-no-files-found: error
@@ -186,6 +188,7 @@ jobs:
           files: |
             artifacts/Sunshine.*.WindowsInstaller.exe
             artifacts/Sunshine.*.WindowsPortable.zip
+            artifacts/Sunshine.*.WindowsDebugInfo.7z
             artifacts/SHA256SUMS.txt
             artifacts/checksums.json
         env:

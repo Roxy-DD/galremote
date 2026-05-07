@@ -1,5 +1,5 @@
 use super::config::{get_config_path, load_config, save_config};
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;

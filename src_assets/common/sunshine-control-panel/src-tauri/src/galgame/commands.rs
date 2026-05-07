@@ -56,7 +56,7 @@ pub fn galgame_add_game(mut game: Game, update: bool, old_name: Option<String>) 
     }
 
     if let Some(index) = target_index {
-        let mut old_game = cfg.games[index].clone();
+        let old_game = cfg.games[index].clone();
         let old_game_name = old_game.name.clone();
 
         // MERGE LOGIC: Preserve everything that is NOT in the basic edit form
@@ -338,7 +338,7 @@ pub async fn galgame_launch_game(app_handle: tauri::AppHandle, game_name: String
                                         .emit("galgame-game-closing", game_name_clone.clone());
                                 }
                                 retry_count += 1;
-                                if (retry_count >= 3) {
+                                if retry_count >= 3 {
                                     // 3 * 5s = 15s grace period
                                     is_running = false;
                                 }
